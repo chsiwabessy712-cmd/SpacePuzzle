@@ -631,7 +631,7 @@ function App() {
   } = useGameLogic(levelData, handleVictory);
 
   const [targetPickerType, setTargetPickerType] = useState(null);
-  const maxLines = currentLevel >= 7 ? (levelData.stones?.length || 0) * 2 : 1;
+  const maxLines = 10;
 
   const arenaCenter = useMemo(() => {
     let minX = Infinity, maxX = -Infinity;
@@ -755,90 +755,62 @@ function App() {
                  background: '#7e57c2', borderRadius: '12px', padding: '15px', display: 'flex', flexDirection: 'column', gap: '12px'
                }}>
                  <div style={{ color: 'white', fontWeight: 'bold', fontSize: '14px', marginBottom: '5px' }}>Pick a command</div>
-                 <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                   {currentLevel < 7 ? (
-                     <button onClick={() => { if (robotCommands.length < maxLines) setTargetPickerType('goto'); }} style={{
-                       background: '#5ae2a0', color: '#1a1a1a', border: 'none', borderRadius: '8px', padding: '8px 15px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', width: 'auto', textAlign: 'left', opacity: robotCommands.length >= maxLines ? 0.5 : 1
-                     }}>
+                  <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                     <div 
+                       className="scratch-cmd"
+                       draggable
+                       onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'command', type: 'goto' }))}
+                       style={{ opacity: robotCommands.length >= maxLines ? 0.5 : 1 }}
+                     >
                        go to
-                     </button>
-                   ) : (
-                     <>
-                       <button onClick={() => { if (robotCommands.length < maxLines) setTargetPickerType('pickup'); }} style={{
-                         background: '#5ae2a0', color: '#1a1a1a', border: 'none', borderRadius: '8px', padding: '8px 15px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', width: 'auto', textAlign: 'left', opacity: robotCommands.length >= maxLines ? 0.5 : 1
-                       }}>
-                         pick up at
-                       </button>
-                       <button onClick={() => { if (robotCommands.length < maxLines) setTargetPickerType('drop'); }} style={{
-                         background: '#5ae2a0', color: '#1a1a1a', border: 'none', borderRadius: '8px', padding: '8px 15px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', width: 'auto', textAlign: 'left', opacity: robotCommands.length >= maxLines ? 0.5 : 1
-                       }}>
-                         drop at
-                       </button>
-                     </>
-                   )}
-
-                   {/* Target Picker Popup */}
-                   {targetPickerType && (
-                     <div style={{
-                       position: 'absolute', top: '0', right: '110%', marginTop: '0',
-                       background: 'white', borderRadius: '14px', padding: '15px 20px',
-                       boxShadow: '0 8px 30px rgba(0,0,0,0.4)', minWidth: '180px', zIndex: 30
-                     }}>
-                       <div style={{ fontWeight: 'bold', fontSize: '14px', textAlign: 'center', marginBottom: '12px', color: '#333' }}>
-                         Select Target
-                       </div>
-                       
-                       {targetPickerType === 'goto' && levelData.robotButtons?.map(rb => (
-                         <button key={rb.id} onClick={() => {
-                           setRobotCommands([...robotCommands, { type: 'goto', targetId: rb.id }]);
-                           setTargetPickerType(null);
-                         }} style={{
-                           display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
-                           background: 'none', border: 'none', padding: '8px', cursor: 'pointer',
-                           fontSize: '15px', color: '#333', borderRadius: '6px'
-                         }}>
-                           <span style={{ display: 'inline-block', width: '14px', height: '14px', background: '#ff3366', borderRadius: '50%' }}></span>
-                           {rb.label} button
-                         </button>
-                       ))}
-
-                       {targetPickerType === 'pickup' && (levelData.stones || []).map((stone, i) => (
-                          <button key={stone.id} onClick={() => {
-                            setRobotCommands([...robotCommands, { type: 'pickup', targetId: stone.id }]);
-                            setTargetPickerType(null);
-                          }} style={{
-                            display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
-                            background: 'none', border: 'none', padding: '8px', cursor: 'pointer',
-                            fontSize: '15px', color: '#333', borderRadius: '6px'
-                          }}>
-                            <span style={{ display: 'inline-block', width: '14px', height: '14px', background: '#e2e8f0', borderRadius: '4px' }}></span>
-                            Stone {i + 1}
-                          </button>
-                        ))}
-
-                        {targetPickerType === 'drop' && (levelData.buttons?.filter(b => b.type === 'podium') || []).map((btn) => (
-                          <button key={btn.id} onClick={() => {
-                            setRobotCommands([...robotCommands, { type: 'drop', targetId: btn.id }]);
-                            setTargetPickerType(null);
-                          }} style={{
-                            display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
-                            background: 'none', border: 'none', padding: '8px', cursor: 'pointer',
-                            fontSize: '15px', color: '#333', borderRadius: '6px'
-                          }}>
-                            <span style={{ display: 'inline-block', width: '14px', height: '14px', background: '#ff3366', borderRadius: '50%' }}></span>
-                            Podium {btn.label}
-                          </button>
-                        ))}
-
-                       <div style={{ textAlign: 'center', marginTop: '10px' }}>
-                         <button onClick={() => setTargetPickerType(null)} style={{
-                           background: 'none', border: 'none', color: '#7c4dff', fontSize: '14px', cursor: 'pointer', fontWeight: 'bold'
-                         }}>Cancel</button>
-                       </div>
+                       <div className="scratch-hole-right" />
                      </div>
-                   )}
-                 </div>
-               </div>
+                     <div 
+                       className="scratch-cmd"
+                       draggable
+                       onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'command', type: 'pickup' }))}
+                       style={{ opacity: robotCommands.length >= maxLines ? 0.5 : 1 }}
+                     >
+                       pick up at
+                       <div className="scratch-hole-right" />
+                     </div>
+                     <div 
+                       className="scratch-cmd"
+                       draggable
+                       onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'command', type: 'drop' }))}
+                       style={{ opacity: robotCommands.length >= maxLines ? 0.5 : 1 }}
+                     >
+                       drop at
+                       <div className="scratch-hole-right" />
+                     </div>
+                  </div>
+                </div>
+
+                <div style={{
+                  background: '#7e57c2', borderRadius: '12px', padding: '15px', display: 'flex', flexDirection: 'column', gap: '12px'
+                }}>
+                  <div style={{ color: 'white', fontWeight: 'bold', fontSize: '14px', marginBottom: '5px' }}>Pick a target</div>
+                  <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {levelData.robotButtons?.map(rb => (
+                      <div key={rb.id} className="scratch-target" draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'target', targetId: rb.id, label: `Button ${rb.label}` }))} style={{ marginLeft: 0 }}>
+                        <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#ff3366', borderRadius: '50%', marginRight: '6px' }}></span>
+                        "Button {rb.label}"
+                      </div>
+                    ))}
+                    {(levelData.stones || []).map((stone, i) => (
+                      <div key={stone.id} className="scratch-target" draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'target', targetId: stone.id, label: `Stone ${i + 1}` }))} style={{ marginLeft: 0 }}>
+                        <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#e2e8f0', borderRadius: '2px', marginRight: '6px' }}></span>
+                        "Stone {i + 1}"
+                      </div>
+                    ))}
+                    {(levelData.buttons?.filter(b => b.type === 'podium') || []).map((btn) => (
+                      <div key={btn.id} className="scratch-target" draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'target', targetId: btn.id, label: `Podium ${btn.label}` }))} style={{ marginLeft: 0 }}>
+                        <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#ff3366', borderRadius: '50%', marginRight: '6px' }}></span>
+                        "Podium {btn.label}"
+                      </div>
+                    ))}
+                  </div>
+                </div>
             </div>
           </div>
 
@@ -855,11 +827,36 @@ function App() {
              </div>
 
              {/* Code Area */}
-             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', width: '100%', gap: '15px' }}>
+             <div 
+               onDragOver={(e) => e.preventDefault()}
+               onDrop={(e) => {
+                 e.preventDefault();
+                 try {
+                   const data = JSON.parse(e.dataTransfer.getData('application/json'));
+                   if (data.category === 'command') {
+                     if (robotCommands.length < maxLines) {
+                       const newCmd = { id: Date.now().toString() + Math.random(), type: data.type, targetId: null };
+                       setRobotCommands([...robotCommands, newCmd]);
+                     }
+                   } else if (data.category === 'target') {
+                     // Magnet system: snap to first incomplete command if dropped anywhere on canvas
+                     const incompleteIndex = robotCommands.findIndex(c => c.targetId === null);
+                     if (incompleteIndex !== -1) {
+                       const newCmds = [...robotCommands];
+                       newCmds[incompleteIndex].targetId = data.targetId;
+                       newCmds[incompleteIndex].targetLabel = data.label;
+                       setRobotCommands(newCmds);
+                     }
+                   }
+                 } catch(err) {}
+               }}
+               style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', width: '100%', gap: '15px' }}
+             >
                {robotCommands.length === 0 ? (
                  <div style={{
                    position: 'relative', width: '100%', padding: '40px 20px', textAlign: 'center',
-                   color: 'rgba(255,255,255,0.4)', fontWeight: 'bold', fontSize: '16px'
+                   color: 'rgba(255,255,255,0.4)', fontWeight: 'bold', fontSize: '16px',
+                   pointerEvents: 'none'
                  }}>
                    {/* Corners */}
                    <div style={{ position: 'absolute', top: 0, left: 0, width: '16px', height: '16px', borderTop: '3px solid rgba(255,255,255,0.3)', borderLeft: '3px solid rgba(255,255,255,0.3)', borderRadius: '4px 0 0 0' }} />
@@ -873,30 +870,52 @@ function App() {
                  robotCommands.map((cmd, i) => {
                    let label = '';
                    let iconStyle = {};
-                   if (cmd.type === 'goto') {
-                     const target = levelData.robotButtons?.find(b => b.id === cmd.targetId);
-                     label = `go to ${target?.label || '?'}`;
-                     iconStyle = { background: '#ff3366', borderRadius: '50%' };
-                   } else if (cmd.type === 'pickup') {
-                     const targetIndex = levelData.stones?.findIndex(s => s.id === cmd.targetId);
-                     label = `pick up at Stone ${targetIndex !== -1 ? targetIndex + 1 : '?'}`;
-                     iconStyle = { background: '#e2e8f0', borderRadius: '4px' };
-                   } else if (cmd.type === 'drop') {
-                     const target = levelData.buttons?.find(b => b.id === cmd.targetId);
-                     label = `drop at Podium ${target?.label || '?'}`;
-                     iconStyle = { background: '#ff3366', borderRadius: '50%' };
-                   }
+                   let targetLabel = cmd.targetLabel || '?';
+                   
+                   const isComplete = cmd.targetId !== null;
+                   const cmdText = cmd.type === 'goto' ? 'go to' : (cmd.type === 'pickup' ? 'pick up at' : 'drop at');
+
                    return (
-                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                     <div key={cmd.id || i} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                        <span style={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace', fontSize: '14px' }}>{i + 1}</span>
-                       <div style={{
-                         background: '#5ae2a0', color: '#1a1a1a', borderRadius: '12px', padding: '12px 25px',
-                         fontWeight: 'bold', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '10px'
-                       }}>
-                         {label.split(' at ')[0]} at
-                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(255,255,255,0.4)', padding: '2px 8px', borderRadius: '8px' }}>
-                           <span style={{ display: 'inline-block', width: '14px', height: '14px', ...iconStyle }}></span>
-                           {label.split(' at ')[1] || ''}
+                       <div style={{ display: 'flex', alignItems: 'center' }}>
+                         <div 
+                           className="scratch-cmd"
+                           draggable 
+                           onDragStart={(e) => { e.dataTransfer.setData('application/json', JSON.stringify({ category: 'existing_command', id: cmd.id })); }}
+                           style={{ borderRadius: isComplete ? '4px 0 0 4px' : '4px', zIndex: 1, paddingRight: isComplete ? '20px' : '20px', minWidth: '80px' }}
+                         >
+                           {cmdText}
+                           {!isComplete && <div className="scratch-hole-right" />}
+                         </div>
+                         <div 
+                           onDragOver={(e) => e.preventDefault()}
+                           onDrop={(e) => {
+                             e.preventDefault();
+                             e.stopPropagation();
+                             try {
+                               const data = JSON.parse(e.dataTransfer.getData('application/json'));
+                               if (data.category === 'target') {
+                                 setRobotCommands(robotCommands.map(c => c.id === cmd.id ? { ...c, targetId: data.targetId, targetLabel: data.label } : c));
+                               }
+                             } catch(err) {}
+                           }}
+                           style={{ display: 'flex', alignItems: 'center' }}
+                         >
+                           {isComplete ? (
+                             <div 
+                               className="scratch-target" 
+                               draggable 
+                               onDragStart={(e) => {
+                                 e.stopPropagation();
+                                 e.dataTransfer.setData('application/json', JSON.stringify({ category: 'attached_target', commandId: cmd.id }));
+                               }}
+                             >
+                               "{targetLabel}"
+                             </div>
+                           ) : (
+                             <div style={{ marginLeft: '-4px', width: '60px', height: '36px', background: 'rgba(0,0,0,0.2)', border: '2px dashed rgba(255,255,255,0.3)', borderLeft: 'none', borderRadius: '0 4px 4px 0', zIndex: 0 }}></div>
+                           )}
                          </div>
                        </div>
                      </div>
@@ -908,24 +927,45 @@ function App() {
              {/* Bottom Action Buttons */}
              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '20px', marginTop: '20px' }}>
                 {robotCommands.length > 0 && !isRobotRunning && (
-                  <button onClick={() => setRobotCommands([])} style={{
+                  <div 
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      try {
+                        const data = JSON.parse(e.dataTransfer.getData('application/json'));
+                        if (data.category === 'existing_command') {
+                          setRobotCommands(robotCommands.filter(c => c.id !== data.id));
+                        }
+                        if (data.category === 'attached_target') {
+                          setRobotCommands(robotCommands.map(c => c.id === data.commandId ? { ...c, targetId: null } : c));
+                        }
+                      } catch(err) {}
+                    }}
+                    onClick={() => setRobotCommands([])}
+                    title="Drag commands here to delete, or click to clear all"
+                    style={{
                     background: '#ff6b81', color: 'white', border: 'none', borderRadius: '16px',
                     width: '60px', height: '60px', fontSize: '24px', cursor: 'pointer',
                     display: 'flex', justifyContent: 'center', alignItems: 'center', boxShadow: '0 4px 0 #cc5566'
                   }}>
                     🗑️
-                  </button>
+                  </div>
                 )}
-                <button onClick={() => {
-                  if (robotCommands.length > 0 && !isRobotRunning) runRobotProgram();
-                }} style={{
-                  background: '#ffd32a', color: '#1a1a1a', border: 'none', borderRadius: '16px',
-                  padding: '0 50px', fontSize: '20px', fontWeight: 'bold', cursor: robotCommands.length > 0 ? 'pointer' : 'default',
-                  boxShadow: robotCommands.length > 0 && !isRobotRunning ? '0 4px 0 #ccaa22' : 'none',
-                  opacity: robotCommands.length > 0 ? 1 : 0.5, height: '60px'
-                }}>
-                  {isRobotRunning ? 'Running...' : 'Run'}
-                </button>
+                {(() => {
+                   const allCommandsComplete = robotCommands.length > 0 && robotCommands.every(cmd => cmd.targetId !== null);
+                   return (
+                     <button onClick={() => {
+                       if (allCommandsComplete && !isRobotRunning) runRobotProgram();
+                     }} style={{
+                       background: '#ffd32a', color: '#1a1a1a', border: 'none', borderRadius: '16px',
+                       padding: '0 50px', fontSize: '20px', fontWeight: 'bold', cursor: allCommandsComplete ? 'pointer' : 'default',
+                       boxShadow: allCommandsComplete && !isRobotRunning ? '0 4px 0 #ccaa22' : 'none',
+                       opacity: allCommandsComplete ? 1 : 0.5, height: '60px'
+                     }}>
+                       {isRobotRunning ? 'Running...' : 'Run'}
+                     </button>
+                   );
+                })()}
              </div>
           </div>
         </div>
@@ -1013,7 +1053,7 @@ function App() {
           nearbyComputer={nearbyComputer}
         />
 
-        {codingMode && currentLevel >= 6 && (levelData.stones || []).map((item, i) => {
+        {codingMode && currentLevel >= 4 && (levelData.stones || []).map((item, i) => {
           const currentStone = stones.find(s => s.id === item.id);
           const cx = currentStone ? currentStone.x : item.x;
           const cz = currentStone ? currentStone.z : item.z;
@@ -1031,7 +1071,7 @@ function App() {
           );
         })}
 
-        {codingMode && currentLevel >= 6 && (levelData.buttons?.filter(b => b.type === 'podium') || []).map((btn) => (
+        {codingMode && currentLevel >= 4 && (levelData.buttons?.filter(b => b.type === 'podium') || []).map((btn) => (
           <Html key={`podium-label-${btn.id}`} position={[btn.x + 0.5, 1.5, btn.z + 0.5]} center sprite style={{ pointerEvents: 'none' }}>
             <div style={{
               background: 'rgba(0,0,0,0.8)', color: '#fff', padding: '4px 10px',
@@ -1044,7 +1084,7 @@ function App() {
           </Html>
         ))}
 
-        {codingMode && currentLevel >= 6 && levelData.robotButtons?.map((rb) => (
+        {codingMode && currentLevel >= 4 && levelData.robotButtons?.map((rb) => (
           <Html key={`goto-label-${rb.id}`} position={[rb.x + 0.5, 1.5, rb.z + 0.5]} center sprite style={{ pointerEvents: 'none' }}>
             <div style={{
               background: 'rgba(0,0,0,0.8)', color: '#fff', padding: '4px 10px',

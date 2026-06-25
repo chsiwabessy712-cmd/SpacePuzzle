@@ -15,8 +15,8 @@ class Random {
 export function generateLevel(level) {
   const rng = new Random(level * 1337);
 
-  // Max 4 islands, but level 6 and 7 are specifically 3 lands
-  const numIslands = (level === 6 || level === 7) ? 3 : Math.min(3 + Math.floor((level - 1) / 2), 4);
+  // Max 4 islands, but level 3 and 4 are specifically 3 lands
+  const numIslands = (level === 3 || level === 4) ? 3 : Math.min(3 + Math.floor((level - 1) / 2), 4);
   
   const islands = [];
   const bridges = [];
@@ -37,8 +37,13 @@ export function generateLevel(level) {
   occupiedTiles.add(`${startPos.x},${startPos.z}`);
 
   for (let i = 0; i < numIslands; i++) {
-    const w = rng.nextInt(4, 7);
-    const d = rng.nextInt(4, 7);
+    let w = rng.nextInt(4, 7);
+    let d = rng.nextInt(4, 7);
+    const isRobotIsland = (level >= 3 && level <= 4 && i === 1) || (level >= 5 && i === 2);
+    if (level >= 4 && isRobotIsland) {
+      if (w < 6) w = 6;
+      if (d < 6) d = 6;
+    }
 
     let zStart = 0;
     if (i > 0) {
@@ -118,10 +123,12 @@ export function generateLevel(level) {
   for (let i = 0; i < numIslands - 1; i++) {
     const bridge = bridges[i];
 
-    // Level 6+ special: first bridge uses computer+robot instead of stone+button
-    if (level >= 6 && i === 0) {
-      // Place computer on island 0 (player's island), avoiding borders and occupied
-      const compIsland = islands[0];
+    const isComputerRobotBridge = (level >= 3 && level <= 4 && i === 0) || (level >= 5 && i === 1);
+
+    // Level 3+ special: bridge uses computer+robot instead of standard puzzle
+    if (isComputerRobotBridge) {
+      // Place computer on island i, avoiding borders and occupied
+      const compIsland = islands[i];
       let cx, cz;
       let attempts = 0;
       do {
@@ -133,8 +140,8 @@ export function generateLevel(level) {
 
       computer = { x: cx, z: cz };
 
-      // Place robot on island 1 (different island)
-      const robotIsland = islands[1];
+      // Place robot on island i + 1
+      const robotIsland = islands[i + 1];
       let rx, rz;
       attempts = 0;
       do {
@@ -146,13 +153,11 @@ export function generateLevel(level) {
 
       robot = { x: rx, z: rz };
 
-      // Level 7+: Place a stone and podium pair for EACH bridge on the robot's island
-      if (level >= 7) {
-        // Ensure robot island is large enough
-        if (robotIsland.w < 6) robotIsland.w = 6;
-        if (robotIsland.d < 6) robotIsland.d = 6;
+      // Level 4+: Place a stone and podium pair for EACH remaining bridge on the robot's island
+      if (level >= 4) {
 
-        const numPairs = bridges.length;
+        const robotBridges = bridges.slice(i);
+        const numPairs = robotBridges.length;
         const labels = ['A', 'B', 'C', 'D', 'E'];
         
         // Collect all valid inner tiles (excluding borders, robot, computer)
@@ -194,20 +199,20 @@ export function generateLevel(level) {
              id: `btn${btnCounter}`,
              type: 'podium',
              x: pt.x, z: pt.z,
-             bridgeId: bridges[bi].id,
+             bridgeId: robotBridges[bi].id,
              label: labels[bi] || String.fromCharCode(65 + bi)
           };
           buttons.push(podium);
-          bridges[bi].reqs.push(podium.id);
+          robotBridges[bi].reqs.push(podium.id);
           btnCounter++;
           
           // Remove used tiles from the arrays
           leftTiles.splice(stoneIdx, 1);
           rightTiles.splice(podiumIdx, 1);
         }
-        islands[1].itemsCount = islands[1].maxItems;
+        robotIsland.itemsCount = robotIsland.maxItems;
       } else {
-        // Level 6: Place a floor button on the robot's island
+        // Level 3: Place a floor button on the robot's island
         let bx, bz;
         let attempts = 0;
         do {
@@ -229,7 +234,7 @@ export function generateLevel(level) {
         buttons.push(rbtn);
         bridge.reqs.push(rbtn.id);
         
-        if (level === 6) {
+        if (level === 3) {
            if (bridges[1]) bridges[1].reqs.push(rbtn.id);
            islands[0].itemsCount = islands[0].maxItems;
         }
@@ -239,11 +244,15 @@ export function generateLevel(level) {
       continue; // skip normal lock generation for this bridge
     }
     
-    if (level === 6 && i === 1) {
-       continue; // skip normal lock generation for second bridge in level 6
+    if (level === 3 && i === 1) {
+       continue; // skip normal lock generation for second bridge in level 3
     }
-    if (level >= 7) {
-       continue; // All bridges handled by robot for level 7+
+    if (level >= 4) {
+       if (level >= 5 && i === 0) {
+         // Allow normal lock generation for bridge 0 in level 5+
+       } else {
+         continue; // All other bridges handled by robot
+       }
     }
 
     if (level === 2 && i === 0) {
@@ -253,8 +262,9 @@ export function generateLevel(level) {
        continue; // First bridge in level 3 is open
     }
 
-    let numLocks = level >= 6 ? 3 : (level >= 3 ? 2 : 1);
+    let numLocks = level >= 3 ? 3 : (level >= 3 ? 2 : 1);
     if ((level === 2 || level === 3) && i === 1) numLocks = 1;
+    if (level >= 5 && i === 0) numLocks = 1;
     if (level === 3 && i === 2) numLocks = 1;
     
     const availableIslands = islands.slice(0, i + 1);
