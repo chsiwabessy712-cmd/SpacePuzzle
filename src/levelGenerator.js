@@ -71,7 +71,7 @@ export function generateLevel(level) {
     }
 
     if (i < numIslands - 1) {
-      const bridgeW = rng.nextInt(1, 3);
+      const bridgeW = 1; // Always 1 tile wide so tube meshes perfectly center on the tile
       // Ensure bridge fits on the current island
       const maxZ = island.zStart + d - bridgeW;
       // Pick a random valid position for the outgoing bridge
@@ -146,48 +146,68 @@ export function generateLevel(level) {
 
       robot = { x: rx, z: rz };
 
-      // Level 7: Place a stone and a podium on the robot's island
-      if (level === 7) {
-        let sx, sz, px, pz;
-        let attempts = 0;
-        do {
-          sx = robotIsland.xStart + rng.nextInt(1, robotIsland.w - 1);
-          sz = robotIsland.zStart + rng.nextInt(1, robotIsland.d - 1);
-          attempts++;
-        } while (occupiedTiles.has(`${sx},${sz}`) && attempts < 100);
-        occupiedTiles.add(`${sx},${sz}`);
-        
-        attempts = 0;
-        do {
-          px = robotIsland.xStart + rng.nextInt(1, robotIsland.w - 1);
-          pz = robotIsland.zStart + rng.nextInt(1, robotIsland.d - 1);
-          attempts++;
-        } while (occupiedTiles.has(`${px},${pz}`) && attempts < 100);
-        occupiedTiles.add(`${px},${pz}`);
+      // Level 7+: Place a stone and podium pair for EACH bridge on the robot's island
+      if (level >= 7) {
+        // Ensure robot island is large enough
+        if (robotIsland.w < 6) robotIsland.w = 6;
+        if (robotIsland.d < 6) robotIsland.d = 6;
 
-        const stone = {
-           id: `stone${stoneCounter}`,
-           x: sx, z: sz,
-           targetId: `btn${btnCounter}`
-        };
-        stones.push(stone);
-        stoneCounter++;
+        const numPairs = bridges.length;
+        const labels = ['A', 'B', 'C', 'D', 'E'];
         
-        const podium = {
-           id: `btn${btnCounter}`,
-           type: 'podium',
-           x: px, z: pz,
-           bridgeId: bridge.id,
-           label: 'B'
-        };
-        buttons.push(podium);
-        bridge.reqs.push(podium.id);
+        // Collect all valid inner tiles (excluding borders, robot, computer)
+        const allTiles = [];
+        for (let tx = robotIsland.xStart + 1; tx < robotIsland.xStart + robotIsland.w - 1; tx++) {
+          for (let tz = robotIsland.zStart + 1; tz < robotIsland.zStart + robotIsland.d - 1; tz++) {
+            if (!occupiedTiles.has(`${tx},${tz}`)) {
+              allTiles.push({ x: tx, z: tz });
+            }
+          }
+        }
         
-        if (bridges[1]) bridges[1].reqs.push(podium.id);
-        islands[0].itemsCount = islands[0].maxItems;
-        btnCounter++;
+        // Split tiles into left half (stones) and right half (podiums)
+        const midX = robotIsland.xStart + Math.floor(robotIsland.w / 2);
+        const leftTiles = allTiles.filter(t => t.x < midX);
+        const rightTiles = allTiles.filter(t => t.x >= midX);
+        
+        for (let bi = 0; bi < numPairs; bi++) {
+          // Place stone on left side
+          let stoneIdx = bi % leftTiles.length;
+          // Spread stones evenly
+          stoneIdx = Math.min(bi, leftTiles.length - 1);
+          const st = leftTiles[stoneIdx];
+          occupiedTiles.add(`${st.x},${st.z}`);
+          
+          // Place podium on right side
+          let podiumIdx = Math.min(bi, rightTiles.length - 1);
+          const pt = rightTiles[podiumIdx];
+          occupiedTiles.add(`${pt.x},${pt.z}`);
+
+          stones.push({
+             id: `stone${stoneCounter}`,
+             x: st.x, z: st.z,
+             targetId: `btn${btnCounter}`
+          });
+          stoneCounter++;
+          
+          const podium = {
+             id: `btn${btnCounter}`,
+             type: 'podium',
+             x: pt.x, z: pt.z,
+             bridgeId: bridges[bi].id,
+             label: labels[bi] || String.fromCharCode(65 + bi)
+          };
+          buttons.push(podium);
+          bridges[bi].reqs.push(podium.id);
+          btnCounter++;
+          
+          // Remove used tiles from the arrays
+          leftTiles.splice(stoneIdx, 1);
+          rightTiles.splice(podiumIdx, 1);
+        }
+        islands[1].itemsCount = islands[1].maxItems;
       } else {
-        // Level 6/8: Place a floor button on the robot's island
+        // Level 6: Place a floor button on the robot's island
         let bx, bz;
         let attempts = 0;
         do {
@@ -211,7 +231,7 @@ export function generateLevel(level) {
         
         if (level === 6) {
            if (bridges[1]) bridges[1].reqs.push(rbtn.id);
-           islands[0].itemsCount = islands[0].maxItems; // ensure no other items on first land
+           islands[0].itemsCount = islands[0].maxItems;
         }
         btnCounter++;
       }
@@ -219,11 +239,23 @@ export function generateLevel(level) {
       continue; // skip normal lock generation for this bridge
     }
     
-    if ((level === 6 || level === 7) && i === 1) {
-       continue; // skip normal lock generation for second bridge, already handled
+    if (level === 6 && i === 1) {
+       continue; // skip normal lock generation for second bridge in level 6
+    }
+    if (level >= 7) {
+       continue; // All bridges handled by robot for level 7+
+    }
+
+    if (level === 2 && i === 0) {
+       continue; // First bridge in level 2 is open
+    }
+    if (level === 3 && i === 0) {
+       continue; // First bridge in level 3 is open
     }
 
     let numLocks = level >= 6 ? 3 : (level >= 3 ? 2 : 1);
+    if ((level === 2 || level === 3) && i === 1) numLocks = 1;
+    if (level === 3 && i === 2) numLocks = 1;
     
     const availableIslands = islands.slice(0, i + 1);
     let totalCapacity = 0;
@@ -234,26 +266,42 @@ export function generateLevel(level) {
     numLocks = Math.min(numLocks, maxLocks);
 
     for (let l = 0; l < numLocks; l++) {
-      const useTrampoline = level >= 3 && level <= 5 && rng.next() > 0.5;
-      
       let targetButtonIsland;
       let targetTrampolineIsland = null;
 
-      if (useTrampoline) {
-        // Button goes to next island (i+1), trampoline goes to available island
-        targetButtonIsland = islands[i + 1];
-        const validTrampolineIslands = availableIslands.filter(isl => isl.itemsCount < isl.maxItems);
-        if (validTrampolineIslands.length === 0) {
-           // fallback to normal
-           targetButtonIsland = availableIslands[rng.nextInt(0, availableIslands.length)];
-        } else {
-           targetTrampolineIsland = validTrampolineIslands[rng.nextInt(0, validTrampolineIslands.length)];
-           targetTrampolineIsland.itemsCount++;
-        }
+      if (level === 2 && i === 1) {
+        targetButtonIsland = islands[0];
+        targetTrampolineIsland = islands[1];
+        targetButtonIsland.itemsCount++;
+        targetTrampolineIsland.itemsCount++;
+      } else if (level === 3 && i === 1) {
+        targetButtonIsland = islands[2];
+        targetTrampolineIsland = islands[1];
+        targetButtonIsland.itemsCount++;
+        targetTrampolineIsland.itemsCount++;
+      } else if (level === 3 && i === 2) {
+        targetButtonIsland = islands[2];
+        targetButtonIsland.itemsCount++;
       } else {
-        const validButtonIslands = availableIslands.filter(isl => isl.itemsCount < isl.maxItems);
-        if (validButtonIslands.length === 0) break;
-        targetButtonIsland = validButtonIslands[rng.nextInt(0, validButtonIslands.length)];
+        let useTrampoline = level >= 3 && level <= 5 && rng.next() > 0.5;
+        if (i === numIslands - 2) useTrampoline = false; // Prevent targeting portal land
+        
+        if (useTrampoline) {
+          // Button goes to next island (i+1), trampoline goes to available island
+          targetButtonIsland = islands[i + 1];
+          const validTrampolineIslands = availableIslands.filter(isl => isl.itemsCount < isl.maxItems);
+          if (validTrampolineIslands.length === 0) {
+             // fallback to normal
+             targetButtonIsland = availableIslands[rng.nextInt(0, availableIslands.length)];
+          } else {
+             targetTrampolineIsland = validTrampolineIslands[rng.nextInt(0, validTrampolineIslands.length)];
+             targetTrampolineIsland.itemsCount++;
+          }
+        } else {
+          const validButtonIslands = availableIslands.filter(isl => isl.itemsCount < isl.maxItems);
+          if (validButtonIslands.length === 0) break;
+          targetButtonIsland = validButtonIslands[rng.nextInt(0, validButtonIslands.length)];
+        }
       }
       
       targetButtonIsland.itemsCount++;
@@ -295,9 +343,20 @@ export function generateLevel(level) {
         });
       }
 
-      const validStoneIslands = availableIslands.filter(isl => isl.itemsCount < isl.maxItems);
-      if (validStoneIslands.length === 0) break;
-      const stoneIsland = validStoneIslands[rng.nextInt(0, validStoneIslands.length)];
+      let stoneIsland;
+      if (level === 2 && i === 1) {
+        stoneIsland = islands[1];
+      } else if (level === 3 && i === 1) {
+        stoneIsland = islands[1];
+      } else if (level === 3 && i === 2) {
+        stoneIsland = islands[2];
+      } else {
+        if (targetTrampolineIsland) {
+          stoneIsland = targetTrampolineIsland;
+        } else {
+          stoneIsland = targetButtonIsland;
+        }
+      }
       stoneIsland.itemsCount++;
       
       attempts = 0;

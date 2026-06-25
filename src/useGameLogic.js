@@ -135,13 +135,15 @@ export const useGameLogic = (levelData, onVictory) => {
         if (!targetBtn) { executeCommand(cmdIndex + 1, currentPos, currentCarriedId); return; }
         targetX = targetBtn.x; targetZ = targetBtn.z;
       } else if (cmd.type === 'pickup') {
+        const anyItem = [...stones, ...(levelData.buttons || [])].find(i => i.id === cmd.targetId);
+        if (!anyItem) { executeCommand(cmdIndex + 1, currentPos, currentCarriedId); return; }
+        targetX = anyItem.x; targetZ = anyItem.z;
         targetStone = stones.find(s => s.id === cmd.targetId);
-        if (!targetStone) { executeCommand(cmdIndex + 1, currentPos, currentCarriedId); return; }
-        targetX = targetStone.x; targetZ = targetStone.z;
       } else if (cmd.type === 'drop') {
+        const anyItem = [...stones, ...(levelData.buttons || [])].find(i => i.id === cmd.targetId);
+        if (!anyItem) { executeCommand(cmdIndex + 1, currentPos, currentCarriedId); return; }
+        targetX = anyItem.x; targetZ = anyItem.z;
         targetBtn = levelData.buttons?.find(b => b.id === cmd.targetId);
-        if (!targetBtn) { executeCommand(cmdIndex + 1, currentPos, currentCarriedId); return; }
-        targetX = targetBtn.x; targetZ = targetBtn.z;
       }
 
       // Build path
@@ -242,16 +244,94 @@ export const useGameLogic = (levelData, onVictory) => {
         return prev;
       }
 
+      let finalX = nextX;
+      let finalZ = nextZ;
+
+      // Check if stepping onto an open glass tube slider
+      let isBridge = false;
+      for (const bridge of levelData.bridges) {
+        if (openBridges[bridge.id]) {
+          if (bridge.tiles.some(t => t.x === nextX && t.z === nextZ)) {
+             // Sucked in! Fly across the gap to the other side
+             if (dx > 0) {
+                 finalX = bridge.x + bridge.gap;
+             } else if (dx < 0) {
+                 finalX = bridge.x - 1;
+             }
+             isBridge = true;
+             break;
+          }
+        }
+      }
+
+      if (isBridge) {
+         setGameState('PRE_FLYING');
+         setDir({ dx, dz });
+         
+         if (carriedStoneId) {
+           const currentIsland = levelData.islands.find(isl => 
+             prev.x >= isl.xStart && prev.x < isl.xStart + isl.w &&
+             prev.z >= isl.zStart && prev.z < isl.zStart + isl.d
+           );
+
+           let dropped = false;
+           if (currentIsland) {
+             const possibleDrops = [];
+             for (let x = currentIsland.xStart; x < currentIsland.xStart + currentIsland.w; x++) {
+               for (let z = currentIsland.zStart; z < currentIsland.zStart + currentIsland.d; z++) {
+                 if (x === prev.x && z === prev.z) continue;
+                 if (isStoneAt(x, z) || isPodium(x, z)) continue;
+                 if (levelData.portal && x === levelData.portal.x && z === levelData.portal.z) continue;
+                 if (levelData.computer && x === levelData.computer.x && z === levelData.computer.z) continue;
+                 possibleDrops.push({ x, z });
+               }
+             }
+
+             if (possibleDrops.length > 0) {
+               const dropPos = possibleDrops[Math.floor(Math.random() * possibleDrops.length)];
+               setStones(prevStones => prevStones.map(s =>
+                 s.id === carriedStoneId ? { ...s, x: dropPos.x, z: dropPos.z } : s
+               ));
+               dropped = true;
+             }
+           }
+           
+           if (!dropped) {
+             setStones(prevStones => prevStones.map(s =>
+               s.id === carriedStoneId ? { ...s, x: prev.x, z: prev.z } : s
+             ));
+           }
+           
+           setCarriedStoneId(null);
+           audioManager.playStoneSound();
+         }
+
+         setTimeout(() => {
+           setGameState('FLYING');
+           setPos({ x: finalX, z: finalZ });
+           audioManager.playMoveSound();
+
+           setTimeout(() => {
+             setGameState('DIZZY');
+             setTimeout(() => {
+               setGameState(prev => prev === 'DIZZY' ? 'PLAYING' : prev);
+             }, 2000); // 2 seconds dizzy
+           }, 2000); // 2 second flight
+         }, 300); // 300ms to lift up before sliding
+         
+         return prev; // Stay in place while lifting
+      }
+
       setDir({ dx, dz });
       
       if (carriedStoneId) {
         setStones(prevStones => prevStones.map(s =>
-          s.id === carriedStoneId ? { ...s, x: nextX, z: nextZ } : s
+          s.id === carriedStoneId ? { ...s, x: finalX, z: finalZ } : s
         ));
       }
 
       audioManager.playMoveSound();
-      return { x: nextX, z: nextZ };
+      return { x: finalX, z: finalZ };
     });
   }, [gameState, codingMode, isStoneAt, isValidTile, carriedStoneId, levelData, isPodium]);
 

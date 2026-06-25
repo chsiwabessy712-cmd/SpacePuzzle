@@ -54,11 +54,6 @@ const FloorButton = ({ position, isActive }) => (
         emissiveIntensity={isActive ? 0.8 : 0}
       />
     </mesh>
-    {/* Wire out */}
-    <mesh position={[0.5, 0.02, 0]}>
-      <boxGeometry args={[0.6, 0.04, 0.04]} />
-      <meshStandardMaterial color={isActive ? '#ffff00' : '#333'} />
-    </mesh>
   </group>
 );
 
@@ -250,57 +245,111 @@ const RobotCharacter = ({ x, z }) => {
   );
 };
 
+const WindEffect = ({ length, radius, isActive }) => {
+  const groupRef = useRef();
+  
+  const lines = useMemo(() => {
+    return Array.from({ length: 15 }).map(() => ({
+      x: (Math.random() - 0.5) * length,
+      y: (Math.random() - 0.5) * (radius * 1.2),
+      z: (Math.random() - 0.5) * (radius * 1.2),
+      speed: 3 + Math.random() * 3,
+      length: 0.3 + Math.random() * 0.8
+    }));
+  }, [length, radius]);
+
+  useFrame((state, delta) => {
+    if (!isActive || !groupRef.current) return;
+    const children = groupRef.current.children;
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i];
+      const data = lines[i];
+      child.position.x += data.speed * delta;
+      if (child.position.x > length / 2) {
+        child.position.x = -length / 2;
+      }
+    }
+  });
+
+  if (!isActive) return null;
+
+  return (
+    <group ref={groupRef}>
+      {lines.map((line, i) => (
+        <mesh key={i} position={[line.x, line.y, line.z]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.015, 0.015, line.length, 8]} />
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.5} />
+        </mesh>
+      ))}
+    </group>
+  );
+};
+
 const Bridge = ({ position, width, gap = 2, isOpen }) => {
-  const { posY } = useSpring({
+  const { posY, emissiveIntensity } = useSpring({
     posY: isOpen ? 0 : -1.5,
+    emissiveIntensity: isOpen ? 1 : 0,
     config: { mass: 1, tension: 150, friction: 15 }
   });
 
-  const length = gap + 0.5;
+  const { portalScale } = useSpring({
+    portalScale: isOpen ? 1 : 0,
+    config: { mass: 1, tension: 200, friction: 15 },
+    delay: isOpen ? 400 : 0
+  });
 
-  // Generate floor planks based on gap
-  const planks = [];
-  for (let i = 0; i < gap; i++) {
-    planks.push(
-      <mesh key={i} position={[i - gap / 2 + 0.5, 0.08, 0]}>
-        <boxGeometry args={[0.8, 0.08, width]} />
-        <meshStandardMaterial color="#8ab8e6" roughness={0.3} />
-        <Edges color="#5a88c6" />
-      </mesh>
-    );
-  }
+  const length = gap + 1.0;
+  const radius = 0.6; 
+  const centerY = 0.6; // Center of the tube
 
   return (
-    <animated.group position-x={position[0]} position-y={posY} position-z={position[2]}>
-      {/* Rails */}
-      <mesh position={[0, 0, -width/2]} castShadow>
-        <boxGeometry args={[length, 0.15, 0.15]} />
-        <meshStandardMaterial color={isOpen ? '#555' : '#333'} />
-      </mesh>
-      <mesh position={[0, 0, width/2]} castShadow>
-        <boxGeometry args={[length, 0.15, 0.15]} />
-        <meshStandardMaterial color={isOpen ? '#555' : '#333'} />
-      </mesh>
-      {/* Floor planks (only visible when open) */}
-      {isOpen && <>{planks}</>}
-      {/* Joints */}
-      <mesh position={[-gap/2, 0, -width/2]}>
-        <boxGeometry args={[0.25, 0.25, 0.25]} />
-        <meshStandardMaterial color="#555" />
-      </mesh>
-      <mesh position={[gap/2, 0, -width/2]}>
-        <boxGeometry args={[0.25, 0.25, 0.25]} />
-        <meshStandardMaterial color="#555" />
-      </mesh>
-      <mesh position={[-gap/2, 0, width/2]}>
-        <boxGeometry args={[0.25, 0.25, 0.25]} />
-        <meshStandardMaterial color="#555" />
-      </mesh>
-      <mesh position={[gap/2, 0, width/2]}>
-        <boxGeometry args={[0.25, 0.25, 0.25]} />
-        <meshStandardMaterial color="#555" />
-      </mesh>
-    </animated.group>
+    <group position-x={position[0]} position-y={0} position-z={position[2]}>
+      
+      {/* Portals (stationary, scaled in with delay so they don't clip through the ground from below) */}
+      <animated.group scale={portalScale}>
+        {/* Portal 1 (Start) */}
+        <mesh position={[-length / 2, centerY, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <torusGeometry args={[radius, 0.08, 16, 32]} />
+          <meshStandardMaterial color={isOpen ? "#aaddff" : "#555"} emissive={isOpen ? "#aaddff" : "#000"} emissiveIntensity={isOpen ? 0.5 : 0} />
+        </mesh>
+
+        {/* Portal 2 (End) */}
+        <mesh position={[length / 2, centerY, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <torusGeometry args={[radius, 0.08, 16, 32]} />
+          <meshStandardMaterial color={isOpen ? "#aaddff" : "#555"} emissive={isOpen ? "#aaddff" : "#000"} emissiveIntensity={isOpen ? 0.5 : 0} />
+        </mesh>
+      </animated.group>
+
+      {/* Connecting Glass Tube (slides up) */}
+      <animated.group position-y={posY}>
+        {/* Wind Animation */}
+        <group position={[0, centerY, 0]}>
+          <WindEffect length={length} radius={radius} isActive={isOpen} />
+        </group>
+
+        <mesh position={[0, centerY, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+          <cylinderGeometry args={[radius, radius, length, 32, 1, true]} />
+          <meshStandardMaterial 
+            color="#aaddff" 
+            transparent 
+            opacity={0.3} 
+            roughness={0.1} 
+            metalness={0.8}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+
+        {/* Lamp inside the tube */}
+        <animated.mesh position={[0, centerY + radius - 0.1, 0]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.05, 0.05, length, 8]} />
+          <animated.meshStandardMaterial 
+            color={isOpen ? "#ffff00" : "#555555"}
+            emissive="#ffff00"
+            emissiveIntensity={emissiveIntensity}
+          />
+        </animated.mesh>
+      </animated.group>
+    </group>
   );
 };
 
@@ -366,17 +415,44 @@ const Portal = ({ position, isActive }) => (
   </group>
 );
 
-const Character = ({ x, z, dx, dz, isFalling, isVictory, showPrompt, isCarrying, nearbyPodium, isAtPortal, canFinish, nearbyComputer }) => {
+const DizzyStars = () => {
+  const starsRef = useRef();
+  
+  useFrame((state, delta) => {
+    if (starsRef.current) {
+      starsRef.current.rotation.y -= delta * 5;
+      // Make the stars bob up and down slightly
+      starsRef.current.position.y = 1.0 + Math.sin(state.clock.elapsedTime * 5) * 0.1;
+    }
+  });
+
+  return (
+    <group ref={starsRef}>
+      {[0, 1, 2].map((i) => {
+        const angle = (i / 3) * Math.PI * 2;
+        return (
+          <mesh key={i} position={[Math.cos(angle) * 0.4, 0, Math.sin(angle) * 0.4]}>
+            <octahedronGeometry args={[0.08, 0]} />
+            <meshStandardMaterial color="#ffff00" emissive="#ddaa00" emissiveIntensity={0.8} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+};
+
+const Character = ({ x, z, dx, dz, isFalling, isFlying, isPreFlying, isDizzy, isVictory, showPrompt, isCarrying, nearbyPodium, isAtPortal, canFinish, nearbyComputer }) => {
   let targetRotation = 0;
   if (dx === -1 && dz === 0) targetRotation = -Math.PI / 2;
   else if (dx === 1 && dz === 0) targetRotation = Math.PI / 2;
   else if (dx === 0 && dz === 1) targetRotation = 0;
   else if (dx === 0 && dz === -1) targetRotation = Math.PI;
 
-  const { position, rotation } = useSpring({
-    position: [x, isFalling ? -15 : 0, z],
+  const { position, rotation, bodyRotation } = useSpring({
+    position: [x, isFalling ? -15 : ((isFlying || isPreFlying) ? 0.6 : 0), z],
     rotation: [0, targetRotation, 0],
-    config: { mass: 1, tension: 200, friction: 20 }
+    bodyRotation: [(isFlying || isPreFlying) ? Math.PI / 2 : 0, 0, 0],
+    config: isFlying ? { mass: 1, tension: 40, friction: 14 } : { mass: 1, tension: 200, friction: 20 }
   });
 
   const danceRef = useRef();
@@ -384,8 +460,14 @@ const Character = ({ x, z, dx, dz, isFalling, isVictory, showPrompt, isCarrying,
     if (isVictory && danceRef.current) {
       danceRef.current.rotation.y += delta * 15;
       danceRef.current.position.y = Math.abs(Math.sin(state.clock.elapsedTime * 15)) * 0.5;
+    } else if (isDizzy && danceRef.current) {
+      // Wobble around like a cartoon character
+      danceRef.current.rotation.z = Math.sin(state.clock.elapsedTime * 15) * 0.2;
+      danceRef.current.rotation.x = Math.cos(state.clock.elapsedTime * 12) * 0.2;
+      danceRef.current.position.y = 0;
     } else if (danceRef.current) {
       danceRef.current.rotation.y = 0;
+      danceRef.current.rotation.z = 0;
       danceRef.current.position.y = 0;
     }
   });
@@ -400,6 +482,9 @@ const Character = ({ x, z, dx, dz, isFalling, isVictory, showPrompt, isCarrying,
            </div>
         </Html>
       )}
+
+      {/* Dizzy Stars */}
+      {isDizzy && <DizzyStars />}
 
       {/* Notification Bubble */}
       {!isVictory && (showPrompt || isCarrying || (isAtPortal && canFinish) || nearbyComputer) && (
@@ -422,7 +507,8 @@ const Character = ({ x, z, dx, dz, isFalling, isVictory, showPrompt, isCarrying,
         </Html>
       )}
 
-      <group ref={danceRef}>
+      <animated.group rotation={bodyRotation}>
+        <group ref={danceRef}>
         {/* Body */}
         <mesh position={[0, 0.25, 0]} castShadow>
           <capsuleGeometry args={[0.2, 0.1, 16, 16]} />
@@ -476,6 +562,7 @@ const Character = ({ x, z, dx, dz, isFalling, isVictory, showPrompt, isCarrying,
           <meshStandardMaterial color="#8B4513" />
         </mesh>
       </group>
+      </animated.group>
     </animated.group>
   );
 };
@@ -512,7 +599,13 @@ function App() {
     return saved ? parseInt(saved) : 1;
   });
 
-  const levelData = useMemo(() => generateLevel(currentLevel), [currentLevel]);
+  const [resetKey, setResetKey] = useState(0);
+
+  const levelData = useMemo(() => generateLevel(currentLevel), [currentLevel, resetKey]);
+
+  const handleRestart = () => {
+    setResetKey(prev => prev + 1);
+  };
 
   const MAX_LEVEL = 8;
 
@@ -538,7 +631,7 @@ function App() {
   } = useGameLogic(levelData, handleVictory);
 
   const [targetPickerType, setTargetPickerType] = useState(null);
-  const maxLines = currentLevel === 7 ? 2 : 1;
+  const maxLines = currentLevel >= 7 ? (levelData.stones?.length || 0) * 2 : 1;
 
   const arenaCenter = useMemo(() => {
     let minX = Infinity, maxX = -Infinity;
@@ -569,20 +662,31 @@ function App() {
     <>
       <div className="ui-layer" style={{ pointerEvents: 'none', position: 'absolute', zIndex: 10, width: '100%', height: '100%' }}>
         <div className="header" style={{ display: 'flex', justifyContent: 'space-between', padding: '20px' }}>
-          <div className="stat-box" style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid #00f3ff', padding: '10px 20px', borderRadius: '8px', color: 'white', fontSize: '1.2rem', pointerEvents: 'auto' }}>
-            <select 
-              value={currentLevel} 
-              onChange={e => {
-                const lvl = parseInt(e.target.value);
-                setCurrentLevel(lvl);
-                localStorage.setItem('puzzleArenaLevel', lvl.toString());
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <div className="stat-box" style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid #00f3ff', padding: '10px 20px', borderRadius: '8px', color: 'white', fontSize: '1.2rem', pointerEvents: 'auto' }}>
+              <select 
+                value={currentLevel} 
+                onChange={e => {
+                  const lvl = parseInt(e.target.value);
+                  setCurrentLevel(lvl);
+                  localStorage.setItem('puzzleArenaLevel', lvl.toString());
+                }}
+                style={{ background: 'transparent', color: 'white', border: 'none', outline: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+              >
+                {Array.from({ length: Math.min(maxUnlockedLevel, MAX_LEVEL) }, (_, i) => i + 1).map(l => (
+                  <option key={l} value={l} style={{ color: 'black' }}>Level {l}</option>
+                ))}
+              </select>
+            </div>
+            <button 
+              onClick={handleRestart}
+              style={{
+                background: 'rgba(0,0,0,0.5)', border: '1px solid #00f3ff', padding: '10px 15px', borderRadius: '8px', color: 'white', fontSize: '1.2rem', cursor: 'pointer', pointerEvents: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
               }}
-              style={{ background: 'transparent', color: 'white', border: 'none', outline: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+              title="Restart Level"
             >
-              {Array.from({ length: Math.min(maxUnlockedLevel, MAX_LEVEL) }, (_, i) => i + 1).map(l => (
-                <option key={l} value={l} style={{ color: 'black' }}>Level {l}</option>
-              ))}
-            </select>
+              <span>🔄</span> Reset
+            </button>
           </div>
           <h1 style={{ margin: 0, textShadow: '0 0 10px #00f3ff', color: '#00f3ff', fontSize: '2rem', letterSpacing: '2px', textTransform: 'uppercase' }}>PUZZLE ARENA</h1>
           <div className="stat-box" style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid #00f3ff', padding: '10px 20px', borderRadius: '8px', color: 'white', fontSize: '1.2rem' }}>Level: {currentLevel}</div>
@@ -652,7 +756,7 @@ function App() {
                }}>
                  <div style={{ color: 'white', fontWeight: 'bold', fontSize: '14px', marginBottom: '5px' }}>Pick a command</div>
                  <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                   {currentLevel !== 7 ? (
+                   {currentLevel < 7 ? (
                      <button onClick={() => { if (robotCommands.length < maxLines) setTargetPickerType('goto'); }} style={{
                        background: '#5ae2a0', color: '#1a1a1a', border: 'none', borderRadius: '8px', padding: '8px 15px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', width: 'auto', textAlign: 'left', opacity: robotCommands.length >= maxLines ? 0.5 : 1
                      }}>
@@ -698,33 +802,33 @@ function App() {
                          </button>
                        ))}
 
-                       {targetPickerType === 'pickup' && levelData.stones?.map((s, i) => (
-                         <button key={s.id} onClick={() => {
-                           setRobotCommands([...robotCommands, { type: 'pickup', targetId: s.id }]);
-                           setTargetPickerType(null);
-                         }} style={{
-                           display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
-                           background: 'none', border: 'none', padding: '8px', cursor: 'pointer',
-                           fontSize: '15px', color: '#333', borderRadius: '6px'
-                         }}>
-                           <span style={{ display: 'inline-block', width: '14px', height: '14px', background: '#e2e8f0', borderRadius: '4px' }}></span>
-                           Stone {i + 1}
-                         </button>
-                       ))}
+                       {targetPickerType === 'pickup' && (levelData.stones || []).map((stone, i) => (
+                          <button key={stone.id} onClick={() => {
+                            setRobotCommands([...robotCommands, { type: 'pickup', targetId: stone.id }]);
+                            setTargetPickerType(null);
+                          }} style={{
+                            display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+                            background: 'none', border: 'none', padding: '8px', cursor: 'pointer',
+                            fontSize: '15px', color: '#333', borderRadius: '6px'
+                          }}>
+                            <span style={{ display: 'inline-block', width: '14px', height: '14px', background: '#e2e8f0', borderRadius: '4px' }}></span>
+                            Stone {i + 1}
+                          </button>
+                        ))}
 
-                       {targetPickerType === 'drop' && levelData.buttons?.filter(b => b.type === 'podium').map(b => (
-                         <button key={b.id} onClick={() => {
-                           setRobotCommands([...robotCommands, { type: 'drop', targetId: b.id }]);
-                           setTargetPickerType(null);
-                         }} style={{
-                           display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
-                           background: 'none', border: 'none', padding: '8px', cursor: 'pointer',
-                           fontSize: '15px', color: '#333', borderRadius: '6px'
-                         }}>
-                           <span style={{ display: 'inline-block', width: '14px', height: '14px', background: '#ff3366', borderRadius: '50%' }}></span>
-                           Podium {b.label}
-                         </button>
-                       ))}
+                        {targetPickerType === 'drop' && (levelData.buttons?.filter(b => b.type === 'podium') || []).map((btn) => (
+                          <button key={btn.id} onClick={() => {
+                            setRobotCommands([...robotCommands, { type: 'drop', targetId: btn.id }]);
+                            setTargetPickerType(null);
+                          }} style={{
+                            display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+                            background: 'none', border: 'none', padding: '8px', cursor: 'pointer',
+                            fontSize: '15px', color: '#333', borderRadius: '6px'
+                          }}>
+                            <span style={{ display: 'inline-block', width: '14px', height: '14px', background: '#ff3366', borderRadius: '50%' }}></span>
+                            Podium {btn.label}
+                          </button>
+                        ))}
 
                        <div style={{ textAlign: 'center', marginTop: '10px' }}>
                          <button onClick={() => setTargetPickerType(null)} style={{
@@ -779,7 +883,7 @@ function App() {
                      iconStyle = { background: '#e2e8f0', borderRadius: '4px' };
                    } else if (cmd.type === 'drop') {
                      const target = levelData.buttons?.find(b => b.id === cmd.targetId);
-                     label = `drop at ${target?.label || '?'}`;
+                     label = `drop at Podium ${target?.label || '?'}`;
                      iconStyle = { background: '#ff3366', borderRadius: '50%' };
                    }
                    return (
@@ -842,8 +946,6 @@ function App() {
 
         {levelData.buttons.map(btn => {
           const active = stoneOnTile(btn.x, btn.z);
-          const bridge = levelData.bridges.find(b => b.id === btn.bridgeId);
-          const bridgeActive = openBridges[btn.bridgeId];
           return (
             <group key={btn.id}>
               {btn.type === 'floor' ? (
@@ -899,6 +1001,9 @@ function App() {
           x={pos.x} z={pos.z}
           dx={dir.dx} dz={dir.dz}
           isFalling={gameState === 'FALLING'}
+          isFlying={gameState === 'FLYING'}
+          isPreFlying={gameState === 'PRE_FLYING'}
+          isDizzy={gameState === 'DIZZY'}
           isVictory={gameState === 'VICTORY'}
           showPrompt={!!nearbyStoneId || !!nearbyPodium}
           isCarrying={!!carriedStoneId}
@@ -907,6 +1012,50 @@ function App() {
           canFinish={levelData.bridges.length === 0 || openBridges[levelData.bridges[levelData.bridges.length - 1].id]}
           nearbyComputer={nearbyComputer}
         />
+
+        {codingMode && currentLevel >= 6 && (levelData.stones || []).map((item, i) => {
+          const currentStone = stones.find(s => s.id === item.id);
+          const cx = currentStone ? currentStone.x : item.x;
+          const cz = currentStone ? currentStone.z : item.z;
+          return (
+            <Html key={`stone-label-${item.id}`} position={[cx + 0.5, 1.5, cz + 0.5]} center sprite style={{ pointerEvents: 'none' }}>
+              <div style={{
+                background: 'rgba(0,0,0,0.8)', color: '#fff', padding: '4px 10px',
+                borderRadius: '6px', fontSize: '14px', fontWeight: 'bold',
+                whiteSpace: 'nowrap', border: '2px solid #e2e8f0',
+                boxShadow: '0 4px 10px rgba(0,0,0,0.5)'
+              }}>
+                Stone {i + 1}
+              </div>
+            </Html>
+          );
+        })}
+
+        {codingMode && currentLevel >= 6 && (levelData.buttons?.filter(b => b.type === 'podium') || []).map((btn) => (
+          <Html key={`podium-label-${btn.id}`} position={[btn.x + 0.5, 1.5, btn.z + 0.5]} center sprite style={{ pointerEvents: 'none' }}>
+            <div style={{
+              background: 'rgba(0,0,0,0.8)', color: '#fff', padding: '4px 10px',
+              borderRadius: '6px', fontSize: '14px', fontWeight: 'bold',
+              whiteSpace: 'nowrap', border: '2px solid #ff3366',
+              boxShadow: '0 4px 10px rgba(0,0,0,0.5)'
+            }}>
+              Podium {btn.label}
+            </div>
+          </Html>
+        ))}
+
+        {codingMode && currentLevel >= 6 && levelData.robotButtons?.map((rb) => (
+          <Html key={`goto-label-${rb.id}`} position={[rb.x + 0.5, 1.5, rb.z + 0.5]} center sprite style={{ pointerEvents: 'none' }}>
+            <div style={{
+              background: 'rgba(0,0,0,0.8)', color: '#fff', padding: '4px 10px',
+              borderRadius: '6px', fontSize: '14px', fontWeight: 'bold',
+              whiteSpace: 'nowrap', border: '2px solid #ff3366',
+              boxShadow: '0 4px 10px rgba(0,0,0,0.5)'
+            }}>
+              Button {rb.label}
+            </div>
+          </Html>
+        ))}
       </Canvas>
     </>
   );
