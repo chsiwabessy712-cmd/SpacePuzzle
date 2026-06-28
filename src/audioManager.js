@@ -9,12 +9,34 @@ class AudioManager {
     this.celebrationMusic.volume = 0.6;
 
     this.hasStarted = false;
+    this.isMuted = false;
+  }
+
+  setMuted(muted) {
+    this.isMuted = muted;
+    this.bgm.muted = muted;
+    this.celebrationMusic.muted = muted;
+    if (muted) {
+      this.bgm.pause();
+      this.celebrationMusic.pause();
+    } else {
+      if (this.hasStarted) {
+        this.bgm.play().catch(e => {});
+      }
+    }
+  }
+
+  toggleMute() {
+    this.setMuted(!this.isMuted);
+    return this.isMuted;
   }
 
   init() {
     if (!this.hasStarted) {
       this.hasStarted = true;
+    if (!this.isMuted) {
       this.bgm.play().catch(err => console.warn('BGM play failed:', err));
+    }
       
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       this.audioContext = new AudioContext();
@@ -27,12 +49,14 @@ class AudioManager {
   playCelebration() {
     this.bgm.pause();
     this.celebrationMusic.currentTime = 0;
-    this.celebrationMusic.play().catch(err => console.warn('Celebration play failed:', err));
+    if (!this.isMuted) {
+      this.celebrationMusic.play().catch(err => console.warn('Celebration play failed:', err));
+    }
   }
 
   resumeBgm() {
     this.celebrationMusic.pause();
-    if (this.hasStarted) {
+    if (this.hasStarted && !this.isMuted) {
       this.bgm.play().catch(err => console.warn('BGM resume failed:', err));
     }
   }

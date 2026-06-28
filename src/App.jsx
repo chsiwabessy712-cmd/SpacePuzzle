@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { useSpring, animated } from '@react-spring/three';
 import { useGameLogic } from './useGameLogic';
 import { generateLevel } from './levelGenerator';
+import { audioManager } from './audioManager';
 import './index.css';
 
 // ----------------------------------------------------------------------------
@@ -79,7 +80,7 @@ const RaisedButton = ({ position, isActive }) => (
   </group>
 );
 
-const StoneBlock = ({ x, z, isCarried, isRobotCarried, bounceState, isOnPodium }) => {
+const StoneBlock = ({ x, z, isCarried, isRobotCarried, bounceState, isOnPodium, stackIndex = 0 }) => {
   const isPreBounce = bounceState && bounceState.phase === 'pre';
   const isJump = bounceState && bounceState.phase === 'jump';
 
@@ -87,7 +88,7 @@ const StoneBlock = ({ x, z, isCarried, isRobotCarried, bounceState, isOnPodium }
   const targetZ = isPreBounce ? bounceState.fromZ : (bounceState ? bounceState.toZ : z);
 
   const { position } = useSpring({
-    position: [targetX, (isCarried || isRobotCarried) ? 1.2 : (isOnPodium ? 1.25 : 0.4), targetZ],
+    position: [targetX, (isCarried || isRobotCarried) ? 1.2 + stackIndex * 0.8 : ((isOnPodium ? 1.25 : 0.4) + stackIndex * 0.8), targetZ],
     config: { mass: 1, tension: 120, friction: 20 }
   });
 
@@ -176,10 +177,31 @@ const Computer = ({ position }) => (
   </group>
 );
 
-const RobotCharacter = ({ x, z }) => {
+const ActiveArrow = () => {
+  const arrowRef = useRef();
+  useFrame((state) => {
+    if (arrowRef.current) {
+      arrowRef.current.position.y = 1.6 + Math.sin(state.clock.elapsedTime * 6) * 0.15;
+    }
+  });
+  return (
+    <group ref={arrowRef} position={[0, 1.6, 0]} scale={[1.8, 1.8, 1.8]}>
+      <mesh position={[0, 0.2, 0]}>
+        <cylinderGeometry args={[0.04, 0.04, 0.2]} />
+        <meshStandardMaterial color="#008800" emissive="#008800" emissiveIntensity={0.8} />
+      </mesh>
+      <mesh position={[0, 0.0, 0]} rotation={[0, 0, Math.PI]}>
+        <coneGeometry args={[0.1, 0.2, 16]} />
+        <meshStandardMaterial color="#008800" emissive="#008800" emissiveIntensity={0.8} />
+      </mesh>
+    </group>
+  );
+};
+
+const RobotCharacter = ({ x, z, isFalling, isActive }) => {
   const { position } = useSpring({
-    position: [x, 0, z],
-    config: { mass: 1, tension: 180, friction: 20 }
+    position: [x, isFalling ? -10 : 0, z],
+    config: isFalling ? { mass: 2, tension: 120, friction: 14 } : { mass: 1, tension: 180, friction: 20 }
   });
 
   const bobRef = useRef();
@@ -191,6 +213,7 @@ const RobotCharacter = ({ x, z }) => {
 
   return (
     <animated.group position={position}>
+      {isActive && <ActiveArrow />}
       <group ref={bobRef}>
         {/* Body */}
         <mesh position={[0, 0.3, 0]} castShadow>
@@ -589,6 +612,12 @@ const CameraController = ({ isVictory, targetPos, arenaCenter }) => {
 // ----------------------------------------------------------------------------
 
 function App() {
+  const [isMuted, setIsMuted] = useState(() => audioManager.isMuted);
+
+  const toggleMute = () => {
+    setIsMuted(audioManager.toggleMute());
+  };
+
   const [currentLevel, setCurrentLevel] = useState(() => {
     const saved = localStorage.getItem('puzzleArenaLevel');
     return saved ? parseInt(saved) : 1;
@@ -626,9 +655,9 @@ function App() {
     pos, dir, gameState, stones, bouncingStones, carriedStoneId,
     nearbyStoneId, nearbyPodium, openBridges, isAtPortal,
     nearbyComputer, codingMode, setCodingMode,
-    robotPos, robotCommands, setRobotCommands,
-    isRobotRunning, runRobotProgram, robotCarriedStoneId
-  } = useGameLogic(levelData, handleVictory);
+    robotPositions, activeRobotId, robotCommands, setRobotCommands,
+    isRobotRunning, runRobotProgram, robotCarriedStones, fallingRobots
+  } = useGameLogic(levelData, handleVictory, handleRestart);
 
   const [targetPickerType, setTargetPickerType] = useState(null);
   const maxLines = 10;
@@ -654,7 +683,7 @@ function App() {
 
   const stoneOnTile = (bx, bz) => {
     const hasStone = stones.some(s => s.x === bx && s.z === bz && s.id !== carriedStoneId);
-    const hasRobot = robotPos && robotPos.x === bx && robotPos.z === bz;
+    const hasRobot = Object.values(robotPositions).some(rPos => rPos.x === bx && rPos.z === bz);
     return hasStone || hasRobot;
   };
 
@@ -687,6 +716,15 @@ function App() {
             >
               <span>🔄</span> Reset
             </button>
+            <button 
+              onClick={toggleMute}
+              style={{
+                background: 'rgba(0,0,0,0.5)', border: '1px solid #00f3ff', padding: '10px 15px', borderRadius: '8px', color: 'white', fontSize: '1.2rem', cursor: 'pointer', pointerEvents: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '50px'
+              }}
+              title={isMuted ? "Unmute Music" : "Mute Music"}
+            >
+              {isMuted ? '🔇' : '🔊'}
+            </button>
           </div>
           <h1 style={{ margin: 0, textShadow: '0 0 10px #00f3ff', color: '#00f3ff', fontSize: '2rem', letterSpacing: '2px', textTransform: 'uppercase' }}>PUZZLE ARENA</h1>
           <div className="stat-box" style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid #00f3ff', padding: '10px 20px', borderRadius: '8px', color: 'white', fontSize: '1.2rem' }}>Level: {currentLevel}</div>
@@ -709,9 +747,9 @@ function App() {
         }}>
           {/* Left Area (Transparent over Game) */}
           <div style={{ flex: 1, position: 'relative' }}>
-            {/* Top Center Close */}
+            {/* Top Right Close */}
             <button onClick={() => setCodingMode(false)} style={{
-              position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)',
+              position: 'absolute', top: '20px', right: '72px',
               background: '#20223d', color: 'white', border: 'none', borderRadius: '50%',
               width: '36px', height: '36px', fontSize: '16px', cursor: 'pointer', zIndex: 5, pointerEvents: 'auto'
             }}>✕</button>
@@ -771,7 +809,7 @@ function App() {
                        onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'command', type: 'pickup' }))}
                        style={{ opacity: robotCommands.length >= maxLines ? 0.5 : 1 }}
                      >
-                       pick up at
+                       pick up obj
                        <div className="scratch-hole-right" />
                      </div>
                      <div 
@@ -797,16 +835,33 @@ function App() {
                         "Button {rb.label}"
                       </div>
                     ))}
-                    {(levelData.stones || []).map((stone, i) => (
-                      <div key={stone.id} className="scratch-target" draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'target', targetId: stone.id, label: `Stone ${i + 1}` }))} style={{ marginLeft: 0 }}>
-                        <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#e2e8f0', borderRadius: '2px', marginRight: '6px' }}></span>
-                        "Stone {i + 1}"
-                      </div>
-                    ))}
-                    {(levelData.buttons?.filter(b => b.type === 'podium') || []).map((btn) => (
-                      <div key={btn.id} className="scratch-target" draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'target', targetId: btn.id, label: `Podium ${btn.label}` }))} style={{ marginLeft: 0 }}>
-                        <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#ff3366', borderRadius: '50%', marginRight: '6px' }}></span>
-                        "Podium {btn.label}"
+                    {(levelData.stones || []).map((item, i) => {
+                      const currentStone = stones.find(s => s.id === item.id);
+                      const cx = currentStone ? currentStone.x : item.x;
+                      const cz = currentStone ? currentStone.z : item.z;
+                      const isOnPodium = levelData.buttons.some(b => b.type === 'podium' && b.x === cx && b.z === cz);
+                      if (isOnPodium) return null;
+                      return (
+                        <div key={item.id} className="scratch-target" draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'target', targetId: item.id, label: `Stone ${i + 1}` }))} style={{ marginLeft: 0 }}>
+                          <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#e2e8f0', borderRadius: '2px', marginRight: '6px' }}></span>
+                          "Stone {i + 1}"
+                        </div>
+                      );
+                    })}
+                    {(levelData.buttons?.filter(b => b.type === 'podium') || []).map((btn) => {
+                      const hasStone = stones.some(s => s.x === btn.x && s.z === btn.z);
+                      if (hasStone) return null;
+                      return (
+                        <div key={btn.id} className="scratch-target" draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'target', targetId: btn.id, label: `Podium ${btn.label}` }))} style={{ marginLeft: 0 }}>
+                          <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#ff3366', borderRadius: '50%', marginRight: '6px' }}></span>
+                          "Podium {btn.label}"
+                        </div>
+                      );
+                    })}
+                    {(levelData.trampolines || []).map((tramp, i) => (
+                      <div key={tramp.id} className="scratch-target" draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'target', targetId: tramp.id, label: `Trampoline ${i+1}` }))} style={{ marginLeft: 0 }}>
+                        <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#33ffaa', borderRadius: '50%', marginRight: '6px' }}></span>
+                        "Trampoline {i+1}"
                       </div>
                     ))}
                   </div>
@@ -873,7 +928,7 @@ function App() {
                    let targetLabel = cmd.targetLabel || '?';
                    
                    const isComplete = cmd.targetId !== null;
-                   const cmdText = cmd.type === 'goto' ? 'go to' : (cmd.type === 'pickup' ? 'pick up at' : 'drop at');
+                   const cmdText = cmd.type === 'goto' ? 'go to' : (cmd.type === 'pickup' ? 'pick up obj' : 'drop at');
 
                    return (
                      <div key={cmd.id || i} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -1022,20 +1077,29 @@ function App() {
           <Trampoline key={tramp.id} position={[tramp.x, 0, tramp.z]} />
         ))}
 
-        {stones.map(stone => {
+        {stones.map((stone, index) => {
           const isOnPodium = levelData.buttons.some(b => b.type === 'podium' && b.x === stone.x && b.z === stone.z);
+          let stackIndex = 0;
+          for (let i = 0; i < index; i++) {
+            if (stones[i].x === stone.x && stones[i].z === stone.z && stones[i].id !== carriedStoneId && !Object.values(robotCarriedStones).includes(stones[i].id)) {
+               stackIndex++;
+            }
+          }
+          if (stone.id === carriedStoneId || Object.values(robotCarriedStones).includes(stone.id)) {
+            stackIndex = 0;
+          }
           return (
-            <StoneBlock key={stone.id} x={stone.x} z={stone.z} isCarried={stone.id === carriedStoneId} isRobotCarried={stone.id === robotCarriedStoneId} bounceState={bouncingStones[stone.id]} isOnPodium={isOnPodium} />
+            <StoneBlock key={stone.id} x={stone.x} z={stone.z} isCarried={stone.id === carriedStoneId} isRobotCarried={Object.values(robotCarriedStones).includes(stone.id)} bounceState={bouncingStones[stone.id]} isOnPodium={isOnPodium} stackIndex={stackIndex} />
           );
         })}
 
-        {levelData.computer && (
-          <Computer position={[levelData.computer.x, 0, levelData.computer.z]} />
-        )}
+        {levelData.computers && levelData.computers.map(comp => (
+          <Computer key={comp.id} position={[comp.x, 0, comp.z]} />
+        ))}
 
-        {robotPos && (
-          <RobotCharacter x={robotPos.x} z={robotPos.z} />
-        )}
+        {Object.entries(robotPositions).map(([id, rPos]) => (
+          <RobotCharacter key={id} x={rPos.x} z={rPos.z} isFalling={fallingRobots[id]} isActive={codingMode && activeRobotId === id} />
+        ))}
 
         <Character
           x={pos.x} z={pos.z}
@@ -1057,6 +1121,8 @@ function App() {
           const currentStone = stones.find(s => s.id === item.id);
           const cx = currentStone ? currentStone.x : item.x;
           const cz = currentStone ? currentStone.z : item.z;
+          const isOnButton = levelData.buttons.some(b => b.x === cx && b.z === cz);
+          if (isOnButton) return null;
           return (
             <Html key={`stone-label-${item.id}`} position={[cx + 0.5, 1.5, cz + 0.5]} center sprite style={{ pointerEvents: 'none' }}>
               <div style={{
@@ -1071,18 +1137,22 @@ function App() {
           );
         })}
 
-        {codingMode && currentLevel >= 4 && (levelData.buttons?.filter(b => b.type === 'podium') || []).map((btn) => (
-          <Html key={`podium-label-${btn.id}`} position={[btn.x + 0.5, 1.5, btn.z + 0.5]} center sprite style={{ pointerEvents: 'none' }}>
-            <div style={{
-              background: 'rgba(0,0,0,0.8)', color: '#fff', padding: '4px 10px',
-              borderRadius: '6px', fontSize: '14px', fontWeight: 'bold',
-              whiteSpace: 'nowrap', border: '2px solid #ff3366',
-              boxShadow: '0 4px 10px rgba(0,0,0,0.5)'
-            }}>
-              Podium {btn.label}
-            </div>
-          </Html>
-        ))}
+        {codingMode && currentLevel >= 4 && (levelData.buttons?.filter(b => b.type === 'podium') || []).map((btn) => {
+          const hasStone = stones.some(s => s.x === btn.x && s.z === btn.z);
+          if (hasStone) return null;
+          return (
+            <Html key={`podium-label-${btn.id}`} position={[btn.x + 0.5, 1.5, btn.z + 0.5]} center sprite style={{ pointerEvents: 'none' }}>
+              <div style={{
+                background: 'rgba(0,0,0,0.8)', color: '#fff', padding: '4px 10px',
+                borderRadius: '6px', fontSize: '14px', fontWeight: 'bold',
+                whiteSpace: 'nowrap', border: '2px solid #ff3366',
+                boxShadow: '0 4px 10px rgba(0,0,0,0.5)'
+              }}>
+                Podium {btn.label}
+              </div>
+            </Html>
+          );
+        })}
 
         {codingMode && currentLevel >= 4 && levelData.robotButtons?.map((rb) => (
           <Html key={`goto-label-${rb.id}`} position={[rb.x + 0.5, 1.5, rb.z + 0.5]} center sprite style={{ pointerEvents: 'none' }}>

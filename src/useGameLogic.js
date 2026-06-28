@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { audioManager } from './audioManager';
 
-export const useGameLogic = (levelData, onVictory) => {
+export const useGameLogic = (levelData, onVictory, onRestart) => {
   const [pos, setPos] = useState(levelData.startPos);
   const [dir, setDir] = useState({ dx: 1, dz: 0 });
   const [gameState, setGameState] = useState('PLAYING');
@@ -10,27 +10,44 @@ export const useGameLogic = (levelData, onVictory) => {
   const [bouncingStones, setBouncingStones] = useState({});
 
   // Robot & Computer state
-  const [robotPos, setRobotPos] = useState(levelData.robot || null);
+  const [robotPositions, setRobotPositions] = useState(() => {
+    const posObj = {};
+    if (levelData.robots) {
+      levelData.robots.forEach(r => posObj[r.id] = { x: r.x, z: r.z });
+    }
+    return posObj;
+  });
+  const [activeRobotId, setActiveRobotId] = useState(null);
   const [codingMode, setCodingMode] = useState(false);
   const [robotCommands, setRobotCommands] = useState([]);
   const [isRobotRunning, setIsRobotRunning] = useState(false);
-  const [robotCarriedStoneId, setRobotCarriedStoneId] = useState(null);
+  const [robotCarriedStones, setRobotCarriedStones] = useState({});
+  const [fallingRobots, setFallingRobots] = useState({});
 
-  // Reset state when level changes
-  useEffect(() => {
+  const resetLevel = useCallback(() => {
     setPos(levelData.startPos);
     setDir({ dx: 1, dz: 0 });
     setGameState('PLAYING');
     setStones(levelData.stones);
     setCarriedStoneId(null);
     setBouncingStones({});
-    setRobotPos(levelData.robot || null);
+    const posObj = {};
+    if (levelData.robots) {
+      levelData.robots.forEach(r => posObj[r.id] = { x: r.x, z: r.z });
+    }
+    setRobotPositions(posObj);
+    setActiveRobotId(null);
     setCodingMode(false);
-    setRobotCommands([]);
     setIsRobotRunning(false);
-    setRobotCarriedStoneId(null);
+    setRobotCarriedStones({});
+    setFallingRobots({});
     audioManager.resumeBgm();
   }, [levelData]);
+
+  // Reset state when level changes
+  useEffect(() => {
+    resetLevel();
+  }, [resetLevel]);
 
   const isBaseTileValid = useCallback((x, z) => {
     return levelData.islands.some(island => 
@@ -46,8 +63,8 @@ export const useGameLogic = (levelData, onVictory) => {
   // Determine which bridges are open
   const openBridges = useMemo(() => {
     const status = {};
-    const stoneOnTile = (bx, bz) => stones.some(s => s.x === bx && s.z === bz && s.id !== carriedStoneId && s.id !== robotCarriedStoneId);
-    const robotOnTile = (bx, bz) => robotPos && robotPos.x === bx && robotPos.z === bz;
+    const stoneOnTile = (bx, bz) => stones.some(s => s.x === bx && s.z === bz && s.id !== carriedStoneId && !Object.values(robotCarriedStones).includes(s.id));
+    const robotOnTile = (bx, bz) => Object.values(robotPositions).some(rPos => rPos.x === bx && rPos.z === bz);
     
     levelData.bridges.forEach(bridge => {
       const requiredButtons = levelData.buttons.filter(b => b.bridgeId === bridge.id);
@@ -56,7 +73,7 @@ export const useGameLogic = (levelData, onVictory) => {
     });
     
     return status;
-  }, [stones, bouncingStones, carriedStoneId, robotCarriedStoneId, levelData, robotPos]);
+  }, [stones, bouncingStones, carriedStoneId, robotCarriedStones, levelData, robotPositions]);
 
   // Check if a tile is valid (base tiles + open bridge tiles)
   const isValidTile = useCallback((x, z) => {
@@ -69,14 +86,18 @@ export const useGameLogic = (levelData, onVictory) => {
     return false;
   }, [isBaseTileValid, openBridges, levelData.bridges]);
 
-  // Find nearby podium
+  // Find nearby button to stack on
   const nearbyPodium = useMemo(() => {
-    for (const p of levelData.buttons.filter(b => b.type === 'podium')) {
+    for (const p of levelData.buttons) {
       const dx = Math.abs(p.x - pos.x);
       const dz = Math.abs(p.z - pos.z);
       if ((dx === 1 && dz === 0) || (dx === 0 && dz === 1)) {
-        const hasStone = stones.some(s => s.x === p.x && s.z === p.z && s.id !== carriedStoneId);
-        if (!hasStone) return p;
+        if (p.type === 'podium') {
+          return p; // allow piling up on podiums
+        } else if (p.type === 'floor') {
+          const hasStone = stones.some(s => s.x === p.x && s.z === p.z && s.id !== carriedStoneId);
+          if (hasStone) return p;
+        }
       }
     }
     return null;
@@ -85,23 +106,29 @@ export const useGameLogic = (levelData, onVictory) => {
   // Find nearby stone
   const nearbyStoneId = useMemo(() => {
     if (carriedStoneId) return null;
+    let foundId = null;
     for (const s of stones) {
       const dx = Math.abs(s.x - pos.x);
       const dz = Math.abs(s.z - pos.z);
       if ((dx === 1 && dz === 0) || (dx === 0 && dz === 1)) {
-        return s.id;
+        foundId = s.id;
       }
     }
-    return null;
+    return foundId;
   }, [pos, stones, carriedStoneId]);
 
   // Detect nearby computer
   const nearbyComputer = useMemo(() => {
-    if (!levelData.computer || carriedStoneId) return false;
-    const dx = Math.abs(levelData.computer.x - pos.x);
-    const dz = Math.abs(levelData.computer.z - pos.z);
-    return (dx === 1 && dz === 0) || (dx === 0 && dz === 1);
-  }, [pos, levelData.computer, carriedStoneId]);
+    if (!levelData.computers || carriedStoneId) return null;
+    for (const comp of levelData.computers) {
+      const dx = Math.abs(comp.x - pos.x);
+      const dz = Math.abs(comp.z - pos.z);
+      if ((dx === 1 && dz === 0) || (dx === 0 && dz === 1)) {
+        return comp;
+      }
+    }
+    return null;
+  }, [pos, levelData.computers, carriedStoneId]);
 
   const isStoneAt = useCallback((x, z) => {
     return stones.some(s => s.x === x && s.z === z && s.id !== carriedStoneId);
@@ -116,7 +143,7 @@ export const useGameLogic = (levelData, onVictory) => {
 
   // Run robot program
   const runRobotProgram = useCallback(() => {
-    if (robotCommands.length === 0 || !robotPos) return;
+    if (robotCommands.length === 0 || !activeRobotId || !robotPositions[activeRobotId]) return;
     setIsRobotRunning(true);
 
     const executeCommand = (cmdIndex, currentPos, currentCarriedId) => {
@@ -131,38 +158,79 @@ export const useGameLogic = (levelData, onVictory) => {
       let targetBtn = null;
 
       if (cmd.type === 'goto') {
-        targetBtn = levelData.robotButtons?.find(b => b.id === cmd.targetId);
-        if (!targetBtn) { executeCommand(cmdIndex + 1, currentPos, currentCarriedId); return; }
-        targetX = targetBtn.x; targetZ = targetBtn.z;
+        let targetItem = levelData.robotButtons?.find(b => b.id === cmd.targetId) || stones.find(s => s.id === cmd.targetId) || levelData.buttons?.find(b => b.id === cmd.targetId) || levelData.trampolines?.find(t => t.id === cmd.targetId);
+        if (!targetItem) { executeCommand(cmdIndex + 1, currentPos, currentCarriedId); return; }
+        targetX = targetItem.x; targetZ = targetItem.z;
       } else if (cmd.type === 'pickup') {
-        const anyItem = [...stones, ...(levelData.buttons || [])].find(i => i.id === cmd.targetId);
-        if (!anyItem) { executeCommand(cmdIndex + 1, currentPos, currentCarriedId); return; }
-        targetX = anyItem.x; targetZ = anyItem.z;
         targetStone = stones.find(s => s.id === cmd.targetId);
+        if (!targetStone) { executeCommand(cmdIndex + 1, currentPos, currentCarriedId); return; }
+        const isNear = Math.abs(currentPos.x - targetStone.x) <= 1 && Math.abs(currentPos.z - targetStone.z) <= 1;
+        if (!isNear) { executeCommand(cmdIndex + 1, currentPos, currentCarriedId); return; }
+        targetX = currentPos.x; targetZ = currentPos.z;
       } else if (cmd.type === 'drop') {
-        const anyItem = [...stones, ...(levelData.buttons || [])].find(i => i.id === cmd.targetId);
+        const anyItem = [...stones, ...(levelData.buttons || []), ...(levelData.trampolines || [])].find(i => i.id === cmd.targetId);
         if (!anyItem) { executeCommand(cmdIndex + 1, currentPos, currentCarriedId); return; }
         targetX = anyItem.x; targetZ = anyItem.z;
         targetBtn = levelData.buttons?.find(b => b.id === cmd.targetId);
       }
 
       // Build path
-      const steps = [];
-      let curX = currentPos.x;
-      let curZ = currentPos.z;
-      
-      while (curX !== targetX) {
-        curX += curX < targetX ? 1 : -1;
-        steps.push({ x: curX, z: curZ });
-      }
-      while (curZ !== targetZ) {
-        curZ += curZ < targetZ ? 1 : -1;
-        steps.push({ x: curX, z: curZ });
-      }
+      let steps = [];
+      if (cmd.type === 'goto' || cmd.type === 'drop') {
+        const isTargetUnwalkable = stones.some(s => s.x === targetX && s.z === targetZ && s.id !== currentCarriedId) || levelData.buttons?.some(b => b.type === 'podium' && b.x === targetX && b.z === targetZ) || levelData.trampolines?.some(t => t.x === targetX && t.z === targetZ);
+        const stopAdjacent = cmd.type === 'drop' || isTargetUnwalkable;
 
-      // For drop, robot stops adjacent to podium (don't step on it)
-      if (cmd.type === 'drop' && steps.length > 0) {
-        steps.pop();
+        const queue = [[{ x: currentPos.x, z: currentPos.z }]];
+        const visited = new Set();
+        visited.add(`${currentPos.x},${currentPos.z}`);
+        let foundPath = null;
+
+        if (currentPos.x === targetX && currentPos.z === targetZ) {
+          foundPath = [{ x: currentPos.x, z: currentPos.z }];
+        } else if (stopAdjacent && Math.abs(currentPos.x - targetX) + Math.abs(currentPos.z - targetZ) === 1) {
+          foundPath = [{ x: currentPos.x, z: currentPos.z }];
+        }
+
+        while (queue.length > 0 && !foundPath) {
+          const path = queue.shift();
+          const current = path[path.length - 1];
+
+          const neighbors = [
+            { x: current.x + 1, z: current.z },
+            { x: current.x - 1, z: current.z },
+            { x: current.x, z: current.z + 1 },
+            { x: current.x, z: current.z - 1 }
+          ];
+
+          for (const n of neighbors) {
+            const key = `${n.x},${n.z}`;
+            if (!visited.has(key)) {
+              visited.add(key);
+              
+              const hasStone = stones.some(s => s.x === n.x && s.z === n.z && s.id !== currentCarriedId);
+              const hasPodium = levelData.buttons?.some(b => b.type === 'podium' && b.x === n.x && b.z === n.z);
+              const walkable = isValidTile(n.x, n.z) && !hasStone && !hasPodium;
+
+              if (walkable) {
+                if (stopAdjacent && (Math.abs(n.x - targetX) + Math.abs(n.z - targetZ) === 1)) {
+                  foundPath = [...path, n];
+                  break;
+                } else if (!stopAdjacent && n.x === targetX && n.z === targetZ) {
+                  foundPath = [...path, n];
+                  break;
+                } else {
+                  queue.push([...path, n]);
+                }
+              }
+            }
+          }
+        }
+        
+        if (!foundPath) {
+          setIsRobotRunning(false);
+          return;
+        }
+        steps = foundPath.slice(1);
       }
 
       // Perform action after arriving (used for both empty and non-empty paths)
@@ -170,16 +238,36 @@ export const useGameLogic = (levelData, onVictory) => {
         setTimeout(() => {
           if (cmd.type === 'pickup' && targetStone) {
             // Pick up the stone - move it to robot position
-            setRobotCarriedStoneId(targetStone.id);
+            setRobotCarriedStones(prev => ({ ...prev, [activeRobotId]: targetStone.id }));
             setStones(prev => prev.map(s => s.id === targetStone.id ? { ...s, x: finalPos.x, z: finalPos.z } : s));
             currentCarriedId = targetStone.id;
           } else if (cmd.type === 'drop' && currentCarriedId) {
             // Drop the stone at the target podium position (NOT the robot position)
             const droppedId = currentCarriedId;
-            setRobotCarriedStoneId(null);
+            setRobotCarriedStones(prev => { const next = {...prev}; delete next[activeRobotId]; return next; });
             setStones(prev => prev.map(s => s.id === droppedId ? { ...s, x: targetX, z: targetZ } : s));
             currentCarriedId = null;
             audioManager.playStoneSound();
+
+            const tramp = levelData.trampolines?.find(t => t.x === targetX && t.z === targetZ);
+            if (tramp) {
+              setBouncingStones(prev => ({ ...prev, [droppedId]: { phase: 'pre', fromX: targetX, fromZ: targetZ, toX: tramp.targetX, toZ: tramp.targetZ, startTime: performance.now() } }));
+              setTimeout(() => {
+                setBouncingStones(prev => {
+                  const current = prev[droppedId];
+                  if (!current) return prev;
+                  return { ...prev, [droppedId]: { ...current, phase: 'jump', startTime: performance.now() } };
+                });
+              }, 600);
+              setTimeout(() => {
+                setStones(prev => prev.map(s => s.id === droppedId ? { ...s, x: tramp.targetX, z: tramp.targetZ } : s));
+                setBouncingStones(prev => {
+                  const next = { ...prev };
+                  delete next[droppedId];
+                  return next;
+                });
+              }, 1400);
+            }
           }
 
           setTimeout(() => {
@@ -193,9 +281,29 @@ export const useGameLogic = (levelData, onVictory) => {
         return;
       }
 
+      let hasFallen = false;
       steps.forEach((step, i) => {
         setTimeout(() => {
-          setRobotPos({ x: step.x, z: step.z });
+          if (hasFallen) return;
+
+          setRobotPositions(prev => ({ ...prev, [activeRobotId]: { x: step.x, z: step.z } }));
+          
+          if (!isValidTile(step.x, step.z)) {
+            hasFallen = true;
+            setIsRobotRunning(false);
+            
+            // Wait for the robot to move to the empty tile before falling
+            setTimeout(() => {
+              setFallingRobots(prev => ({ ...prev, [activeRobotId]: true }));
+              setTimeout(() => {
+                if (onRestart) onRestart();
+                else resetLevel();
+              }, 1200);
+            }, 300);
+            
+            return;
+          }
+          
           audioManager.playMoveSound();
           
           // Move carried stone with robot
@@ -211,8 +319,8 @@ export const useGameLogic = (levelData, onVictory) => {
       });
     };
 
-    executeCommand(0, robotPos, robotCarriedStoneId);
-  }, [robotCommands, robotPos, levelData.robotButtons, levelData.buttons, stones, robotCarriedStoneId]);
+    executeCommand(0, robotPositions[activeRobotId], robotCarriedStones[activeRobotId]);
+  }, [robotCommands, activeRobotId, robotPositions, levelData.robotButtons, levelData.buttons, stones, robotCarriedStones, resetLevel, isValidTile]);
 
   const move = useCallback((dx, dz) => {
     if (gameState !== 'PLAYING' || codingMode) return;
@@ -224,23 +332,16 @@ export const useGameLogic = (levelData, onVictory) => {
       if (!isValidTile(nextX, nextZ)) {
         setGameState('FALLING');
         setTimeout(() => {
-          setPos(levelData.startPos);
-          setDir({ dx: 1, dz: 0 });
-          setGameState('PLAYING');
-          setStones(levelData.stones);
-          setCarriedStoneId(null);
-          setBouncingStones({});
-          setRobotPos(levelData.robot || null);
-          setRobotCommands([]);
-          setIsRobotRunning(false);
-        }, 1000);
-        return prev;
+          if (onRestart) onRestart();
+          else resetLevel();
+        }, 1500);
+        return { x: nextX, z: nextZ };
       }
 
       if (isStoneAt(nextX, nextZ) || isPodium(nextX, nextZ)) {
         return prev;
       }
-      if (levelData.computer && nextX === levelData.computer.x && nextZ === levelData.computer.z) {
+      if (levelData.computers && levelData.computers.some(c => c.x === nextX && c.z === nextZ)) {
         return prev;
       }
 
@@ -282,7 +383,7 @@ export const useGameLogic = (levelData, onVictory) => {
                  if (x === prev.x && z === prev.z) continue;
                  if (isStoneAt(x, z) || isPodium(x, z)) continue;
                  if (levelData.portal && x === levelData.portal.x && z === levelData.portal.z) continue;
-                 if (levelData.computer && x === levelData.computer.x && z === levelData.computer.z) continue;
+                 if (levelData.computers && levelData.computers.some(c => c.x === x && c.z === z)) continue;
                  possibleDrops.push({ x, z });
                }
              }
@@ -311,12 +412,12 @@ export const useGameLogic = (levelData, onVictory) => {
            setPos({ x: finalX, z: finalZ });
            audioManager.playMoveSound();
 
-           setTimeout(() => {
-             setGameState('DIZZY');
-             setTimeout(() => {
-               setGameState(prev => prev === 'DIZZY' ? 'PLAYING' : prev);
-             }, 2000); // 2 seconds dizzy
-           }, 2000); // 2 second flight
+            setTimeout(() => {
+              setGameState('DIZZY');
+              setTimeout(() => {
+                setGameState(prev => prev === 'DIZZY' ? 'PLAYING' : prev);
+              }, 2000); // 2 seconds dizzy
+            }, 800); // 800ms flight
          }, 300); // 300ms to lift up before sliding
          
          return prev; // Stay in place while lifting
@@ -340,6 +441,8 @@ export const useGameLogic = (levelData, onVictory) => {
     if (codingMode) return;
 
     if (nearbyComputer && !carriedStoneId) {
+      setActiveRobotId(nearbyComputer.targetRobotId);
+      setRobotCommands([]);
       setCodingMode(true);
       return;
     }
@@ -463,7 +566,7 @@ export const useGameLogic = (levelData, onVictory) => {
     pos, dir, gameState, stones, bouncingStones, carriedStoneId,
     nearbyStoneId, nearbyPodium, openBridges, isAtPortal,
     nearbyComputer, codingMode, setCodingMode,
-    robotPos, robotCommands, setRobotCommands,
-    isRobotRunning, runRobotProgram, robotCarriedStoneId
+    robotPositions, activeRobotId, robotCommands, setRobotCommands,
+    isRobotRunning, runRobotProgram, robotCarriedStones, fallingRobots
   };
 };

@@ -12,7 +12,7 @@ class Random {
   }
 }
 
-export function generateLevel(level) {
+function generateLevel(level) {
   const rng = new Random(level * 1337);
 
   // Max 4 islands, but level 3 and 4 are specifically 3 lands
@@ -72,9 +72,6 @@ export function generateLevel(level) {
     if (i > 0) {
       for (let bw = 0; bw < prevBridgeW; bw++) {
         occupiedTiles.add(`${currentX},${currentZ + bw}`);
-        occupiedTiles.add(`${currentX + 1},${currentZ + bw}`); // In front of tube
-        occupiedTiles.add(`${currentX},${currentZ + bw - 1}`); // Beside tube
-        occupiedTiles.add(`${currentX},${currentZ + bw + 1}`); // Beside tube
       }
     }
 
@@ -88,9 +85,6 @@ export function generateLevel(level) {
       // Mark outgoing bridge tiles on this island as occupied
       for (let bw = 0; bw < bridgeW; bw++) {
         occupiedTiles.add(`${currentX + w - 1},${bridgeZ + bw}`);
-        occupiedTiles.add(`${currentX + w - 2},${bridgeZ + bw}`); // In front of tube
-        occupiedTiles.add(`${currentX + w - 1},${bridgeZ + bw - 1}`); // Beside tube
-        occupiedTiles.add(`${currentX + w - 1},${bridgeZ + bw + 1}`); // Beside tube
       }
       
       prevBridgeW = bridgeW;
@@ -122,15 +116,14 @@ export function generateLevel(level) {
   }
 
   // PASS 2: Generate Locks and Items
-  let computers = [];
-  let robots = [];
+  let computer = null;
+  let robot = null;
   let robotButtons = [];
-  let nextPodiumLabelCode = 65;
 
   for (let i = 0; i < numIslands - 1; i++) {
     const bridge = bridges[i];
 
-    const isComputerRobotBridge = (level >= 3 && level <= 4 && i === 0) || (level >= 5 && (i === 0 || i === 1));
+    const isComputerRobotBridge = (level >= 3 && level <= 4 && i === 0) || (level >= 5 && i === 1);
 
     // Level 3+ special: bridge uses computer+robot instead of standard puzzle
     if (isComputerRobotBridge) {
@@ -139,156 +132,84 @@ export function generateLevel(level) {
       let cx, cz;
       let attempts = 0;
       do {
-        if (attempts === 0) {
-          // Try bottom-left corner to keep computer away from stones, robots, and podiums
-          cx = compIsland.xStart + 1;
-          cz = compIsland.zStart + compIsland.d - 2;
-        } else {
-          cx = compIsland.xStart + rng.nextInt(1, compIsland.w - 1);
-          cz = compIsland.zStart + rng.nextInt(1, compIsland.d - 1);
-        }
+        cx = compIsland.xStart + rng.nextInt(1, compIsland.w - 1);
+        cz = compIsland.zStart + rng.nextInt(1, compIsland.d - 1);
         attempts++;
       } while (occupiedTiles.has(`${cx},${cz}`) && attempts < 100);
       occupiedTiles.add(`${cx},${cz}`);
 
-      computers.push({ id: `comp${i}`, x: cx, z: cz, targetRobotId: `robot${i+1}` });
+      computer = { x: cx, z: cz };
 
       // Place robot on island i + 1
       const robotIsland = islands[i + 1];
       let rx, rz;
       attempts = 0;
       do {
-        if (attempts === 0) {
-          // Try top-right corner to keep robot away from stones (top-left) and podiums (bottom-right)
-          rx = robotIsland.xStart + robotIsland.w - 2;
-          rz = robotIsland.zStart + 1;
-        } else {
-          rx = robotIsland.xStart + rng.nextInt(1, robotIsland.w - 1);
-          rz = robotIsland.zStart + rng.nextInt(1, robotIsland.d - 1);
-        }
+        rx = robotIsland.xStart + rng.nextInt(1, robotIsland.w - 1);
+        rz = robotIsland.zStart + rng.nextInt(1, robotIsland.d - 1);
         attempts++;
       } while (occupiedTiles.has(`${rx},${rz}`) && attempts < 100);
       occupiedTiles.add(`${rx},${rz}`);
 
-      robots.push({ id: `robot${i+1}`, x: rx, z: rz });
+      robot = { x: rx, z: rz };
 
       // Level 4+: Place a stone and podium pair for EACH remaining bridge on the robot's island
       if (level >= 4) {
 
-        const robotBridges = (level >= 5) ? [bridges[i]] : bridges.slice(i);
+        const robotBridges = bridges.slice(i);
         const numPairs = robotBridges.length;
+        const labels = ['A', 'B', 'C', 'D', 'E'];
         
-        // Collect all valid tiles (excluding robot, computer, and portal)
-        let allTiles = [];
-        for (let tx = robotIsland.xStart; tx < robotIsland.xStart + robotIsland.w; tx++) {
-          for (let tz = robotIsland.zStart; tz < robotIsland.zStart + robotIsland.d; tz++) {
-            // Leave a 1-tile gap from portal if this is the last island
-            let isNearPortal = false;
-            if (i === numIslands - 2) {
-              const px = robotIsland.xStart + Math.floor((robotIsland.w - 2) / 2);
-              const pz = robotIsland.zStart + Math.floor((robotIsland.d - 2) / 2);
-              if (tx >= px - 1 && tx <= px + 2 && tz >= pz - 1 && tz <= pz + 2) {
-                isNearPortal = true;
-              }
-            }
-            if (!occupiedTiles.has(`${tx},${tz}`) && !isNearPortal) {
+        // Collect all valid inner tiles (excluding borders, robot, computer)
+        const allTiles = [];
+        for (let tx = robotIsland.xStart + 1; tx < robotIsland.xStart + robotIsland.w - 1; tx++) {
+          for (let tz = robotIsland.zStart + 1; tz < robotIsland.zStart + robotIsland.d - 1; tz++) {
+            if (!occupiedTiles.has(`${tx},${tz}`)) {
               allTiles.push({ x: tx, z: tz });
             }
           }
         }
         
-        // Sort tiles by distance from top-left corner to spread stones and podiums
-        allTiles.sort((a, b) => {
-           const distA = (a.x - robotIsland.xStart) + (a.z - robotIsland.zStart);
-           const distB = (b.x - robotIsland.xStart) + (b.z - robotIsland.zStart);
-           return distA - distB;
-        });
+        // Split tiles into left half (stones) and right half (podiums)
+        const midX = robotIsland.xStart + Math.floor(robotIsland.w / 2);
+        const leftTiles = allTiles.filter(t => t.x < midX);
+        const rightTiles = allTiles.filter(t => t.x >= midX);
         
         for (let bi = 0; bi < numPairs; bi++) {
-          if (allTiles.length < 2) break; // Safety check
-
-          const useTrampoline = (level === 7 || level === 8);
-
-          // Place stone at top-left-most available
-          const st = allTiles.shift();
+          // Place stone on left side
+          let stoneIdx = bi % leftTiles.length;
+          // Spread stones evenly
+          stoneIdx = Math.min(bi, leftTiles.length - 1);
+          const st = leftTiles[stoneIdx];
           occupiedTiles.add(`${st.x},${st.z}`);
           
-          // Place podium/trampoline at bottom-right-most available
-          const pt = allTiles.pop();
+          // Place podium on right side
+          let podiumIdx = Math.min(bi, rightTiles.length - 1);
+          const pt = rightTiles[podiumIdx];
           occupiedTiles.add(`${pt.x},${pt.z}`);
 
           stones.push({
              id: `stone${stoneCounter}`,
              x: st.x, z: st.z,
-             targetId: useTrampoline ? `tramp${btnCounter}` : `btn${btnCounter}`
+             targetId: `btn${btnCounter}`
           });
           stoneCounter++;
           
-          if (useTrampoline) {
-             let bx, bz;
-             let attempts = 0;
-             const targetIsland = islands[i];
-             do {
-               bx = targetIsland.xStart + rng.nextInt(0, targetIsland.w);
-               bz = targetIsland.zStart + rng.nextInt(0, targetIsland.d);
-               attempts++;
-             } while (occupiedTiles.has(`${bx},${bz}`) && attempts < 100);
-             occupiedTiles.add(`${bx},${bz}`);
-
-             let trTargetX, trTargetZ;
-             attempts = 0;
-             do {
-               trTargetX = targetIsland.xStart + rng.nextInt(0, targetIsland.w);
-               trTargetZ = targetIsland.zStart + rng.nextInt(0, targetIsland.d);
-               attempts++;
-             } while (occupiedTiles.has(`${trTargetX},${trTargetZ}`) && attempts < 100);
-             occupiedTiles.add(`${trTargetX},${trTargetZ}`);
-
-             const podium = {
-                id: `btn${btnCounter}`,
-                type: 'podium',
-                x: bx, z: bz,
-                bridgeId: robotBridges[bi].id,
-                label: String.fromCharCode(nextPodiumLabelCode++)
-             };
-             buttons.push(podium);
-             
-             trampolines.push({
-                id: `tramp${btnCounter}`,
-                x: pt.x, z: pt.z,
-                targetX: trTargetX, targetZ: trTargetZ
-             });
-             robotBridges[bi].reqs.push(podium.id);
-          } else {
-             const podium = {
-                id: `btn${btnCounter}`,
-                type: 'podium',
-                x: pt.x, z: pt.z,
-                bridgeId: robotBridges[bi].id,
-                label: String.fromCharCode(nextPodiumLabelCode++)
-             };
-             buttons.push(podium);
-             robotBridges[bi].reqs.push(podium.id);
-          }
+          const podium = {
+             id: `btn${btnCounter}`,
+             type: 'podium',
+             x: pt.x, z: pt.z,
+             bridgeId: robotBridges[bi].id,
+             label: labels[bi] || String.fromCharCode(65 + bi)
+          };
+          buttons.push(podium);
+          robotBridges[bi].reqs.push(podium.id);
           btnCounter++;
+          
+          // Remove used tiles from the arrays
+          leftTiles.splice(stoneIdx, 1);
+          rightTiles.splice(podiumIdx, 1);
         }
-        
-        if (level === 6 && allTiles.length > 0) {
-           const rbt = allTiles.shift();
-           occupiedTiles.add(`${rbt.x},${rbt.z}`);
-           const rbtn = {
-             id: `rbtn${btnCounter}`,
-             type: 'floor',
-             x: rbt.x, z: rbt.z,
-             bridgeId: robotBridges[0].id,
-             label: String.fromCharCode(nextPodiumLabelCode++)
-           };
-           robotButtons.push(rbtn);
-           buttons.push(rbtn);
-           robotBridges[0].reqs.push(rbtn.id);
-           btnCounter++;
-        }
-
         robotIsland.itemsCount = robotIsland.maxItems;
       } else {
         // Level 3: Place a floor button on the robot's island
@@ -326,6 +247,13 @@ export function generateLevel(level) {
     if (level === 3 && i === 1) {
        continue; // skip normal lock generation for second bridge in level 3
     }
+    if (level >= 4) {
+       if (level >= 5 && i === 0) {
+         // Allow normal lock generation for bridge 0 in level 5+
+       } else {
+         continue; // All other bridges handled by robot
+       }
+    }
 
     if (level === 2 && i === 0) {
        continue; // First bridge in level 2 is open
@@ -336,7 +264,7 @@ export function generateLevel(level) {
 
     let numLocks = level >= 3 ? 3 : (level >= 3 ? 2 : 1);
     if ((level === 2 || level === 3) && i === 1) numLocks = 1;
-    if (level >= 5 && i === 0) numLocks = 1;
+    if (level >= 5 && i === 0) numLocks = 2;
     if (level === 3 && i === 2) numLocks = 1;
     
     const availableIslands = islands.slice(0, i + 1);
@@ -371,13 +299,12 @@ export function generateLevel(level) {
         if (useTrampoline) {
           // Button goes to next island (i+1), trampoline goes to available island
           targetButtonIsland = islands[i + 1];
-          const trampolineIsland = islands[i];
-          if (trampolineIsland.itemsCount >= trampolineIsland.maxItems) {
+          const validTrampolineIslands = availableIslands.filter(isl => isl.itemsCount < isl.maxItems);
+          if (validTrampolineIslands.length === 0) {
              // fallback to normal
              targetButtonIsland = availableIslands[rng.nextInt(0, availableIslands.length)];
-             useTrampoline = false;
           } else {
-             targetTrampolineIsland = trampolineIsland;
+             targetTrampolineIsland = validTrampolineIslands[rng.nextInt(0, validTrampolineIslands.length)];
              targetTrampolineIsland.itemsCount++;
           }
         } else {
@@ -417,21 +344,12 @@ export function generateLevel(level) {
         } while (occupiedTiles.has(`${tx},${tz}`) && attempts < 100);
         occupiedTiles.add(`${tx},${tz}`);
         
-        let trTargetX, trTargetZ;
-        attempts = 0;
-        do {
-          trTargetX = targetButtonIsland.xStart + rng.nextInt(0, targetButtonIsland.w);
-          trTargetZ = targetButtonIsland.zStart + rng.nextInt(0, targetButtonIsland.d);
-          attempts++;
-        } while (occupiedTiles.has(`${trTargetX},${trTargetZ}`) && attempts < 100);
-        occupiedTiles.add(`${trTargetX},${trTargetZ}`);
-
         trampolines.push({
            id: `tramp${btnCounter}`,
            x: tx,
            z: tz,
-           targetX: trTargetX,
-           targetZ: trTargetZ
+           targetX: bx,
+           targetZ: bz
         });
       }
 
@@ -464,8 +382,7 @@ export function generateLevel(level) {
         type: isPodium ? 'podium' : 'floor',
         x: bx,
         z: bz,
-        bridgeId: bridge.id,
-        ...(isPodium ? { label: String.fromCharCode(nextPodiumLabelCode++) } : {})
+        bridgeId: bridge.id
       });
 
       stones.push({
@@ -488,118 +405,6 @@ export function generateLevel(level) {
 
   const portal = { x: px, z: pz };
 
-  if (level === 7) {
-    const btn4 = buttons.find(b => b.id === 'btn4');
-    if (btn4) {
-      btn4.x = 4;
-      btn4.z = 0;
-      btn4.bridgeId = 'bridge1';
-    }
-
-    const stone3 = stones.find(s => s.id === 'stone3');
-    if (stone3) {
-      stone3.x = 9;
-      stone3.z = 6;
-    }
-
-    const bridge1 = bridges.find(b => b.id === 'bridge1');
-    if (bridge1 && !bridge1.reqs.includes('btn4')) {
-      bridge1.reqs.push('btn4');
-    }
-
-    const bridge3 = bridges.find(b => b.id === 'bridge3');
-    if (bridge3) {
-      bridge3.reqs = bridge3.reqs.filter(id => id !== 'btn4');
-    }
-  }
-
-  if (level === 8) {
-    const btn1 = buttons.find(b => b.id === 'btn1');
-    if (btn1) {
-      btn1.x = 0;
-      btn1.z = 3;
-    }
-
-    const stone1 = stones.find(s => s.id === 'stone1');
-    if (stone1) {
-      stone1.x = 17;
-      stone1.z = 0;
-    }
-
-    const stone2 = stones.find(s => s.id === 'stone2');
-    if (stone2) {
-      stone2.x = 13;
-      stone2.z = -2;
-    }
-
-    const stone3 = stones.find(s => s.id === 'stone3');
-    if (stone3) {
-      stone3.x = 17;
-      stone3.z = 1;
-    }
-
-    const stone4 = stones.find(s => s.id === 'stone4');
-    if (stone4) {
-      stone4.x = 17;
-      stone4.z = 2;
-    }
-
-    const comp0 = computers.find(c => c.id === 'comp0');
-    if (comp0) {
-      comp0.x = 4;
-      comp0.z = 4;
-    }
-
-    const btn3 = buttons.find(b => b.id === 'btn3');
-    if (btn3) {
-      btn3.x = 4;
-      btn3.z = 0;
-    }
-
-    const btn5 = {
-      id: 'btn5',
-      type: 'floor',
-      x: 11,
-      z: 2,
-      bridgeId: 'bridge1',
-      label: 'D'
-    };
-    buttons.push(btn5);
-    robotButtons.push(btn5);
-
-    const btn6 = {
-      id: 'btn6',
-      type: 'floor',
-      x: 19,
-      z: 3,
-      bridgeId: 'bridge3',
-      label: 'E'
-    };
-    buttons.push(btn6);
-    robotButtons.push(btn6);
-    
-    const bridge1 = bridges.find(b => b.id === 'bridge1');
-    const bridge2 = bridges.find(b => b.id === 'bridge2');
-    const bridge3 = bridges.find(b => b.id === 'bridge3');
-    
-    // Make btn1 open bridge2 instead
-    if (btn1) btn1.bridgeId = 'bridge2';
-    if (bridge1) bridge1.reqs = bridge1.reqs.filter(id => id !== 'btn1');
-    if (bridge2) bridge2.reqs.push('btn1');
-
-    // Make btn2 and btn5 open bridge1
-    const btn2 = buttons.find(b => b.id === 'btn2');
-    if (btn2) {
-      btn2.bridgeId = 'bridge1';
-      if (bridge2) bridge2.reqs = bridge2.reqs.filter(id => id !== 'btn2');
-      if (bridge1) bridge1.reqs.push('btn2');
-    }
-    if (bridge1) bridge1.reqs.push('btn5');
-    
-    // btn6 opens bridge3
-    if (bridge3) bridge3.reqs.push('btn6');
-  }
-
   return {
     level,
     startPos,
@@ -608,8 +413,8 @@ export function generateLevel(level) {
     buttons,
     stones,
     trampolines,
-    computers,
-    robots,
+    computer,
+    robot,
     robotButtons,
     portal
   };

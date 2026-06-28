@@ -72,8 +72,16 @@ body {
   padding: 0;
   width: 100vw;
   height: 100vh;
-  background-color: #001a33;
+  background: linear-gradient(45deg, #000814, #001a33, #002b5e, #001a33);
+  background-size: 400% 400%;
+  animation: liquidGradient 15s ease infinite;
   overflow: hidden;
+}
+
+@keyframes liquidGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 * {
@@ -91,7 +99,7 @@ body::before {
   content: "";
   position: absolute;
   top: 0; left: 0; width: 100%; height: 100%;
-  background-color: #001a33;
+  background-color: transparent;
   background-image: 
     radial-gradient(circle at 50% 50%, rgba(0, 100, 200, 0.4) 0%, transparent 80%),
     radial-gradient(1px 1px at 10% 20%, white 100%, transparent),
@@ -103,6 +111,92 @@ body::before {
   background-size: 100% 100%, 200px 200px, 300px 300px, 400px 400px, 150px 150px, 250px 250px, 350px 350px;
   background-position: 0 0;
   z-index: -1;
+  animation: moveStars 20s linear infinite;
+}
+
+@keyframes moveStars {
+  from {
+    background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+  }
+  to {
+    background-position: 0 0, -200px 0, -300px 0, -400px 0, -150px 0, -250px 0, -350px 0;
+  }
+}
+
+body::after, #root::before, #root::after {
+  content: "";
+  position: absolute;
+  width: 150px;
+  height: 2px;
+  background: linear-gradient(to right, rgba(255,255,255,1), rgba(255,255,255,0));
+  box-shadow: 0 0 8px rgba(255,255,255,0.8);
+  transform-origin: left center;
+  transform: rotate(-45deg);
+  z-index: -1;
+  opacity: 0;
+  pointer-events: none;
+}
+
+body::after {
+  top: 10%;
+  right: 20%;
+  animation: shootingStar 12s linear infinite 0s;
+}
+
+#root::before {
+  top: 30%;
+  right: 10%;
+  animation: shootingStar 9s linear infinite 4s;
+}
+
+#root::after {
+  top: 5%;
+  right: 50%;
+  animation: shootingStar 14s linear infinite 7s;
+}
+
+@keyframes shootingStar {
+  0% {
+    transform: rotate(-45deg) translateX(300px);
+    opacity: 1;
+  }
+  15% {
+    transform: rotate(-45deg) translateX(-1500px);
+    opacity: 0;
+  }
+  100% {
+    transform: rotate(-45deg) translateX(-1500px);
+    opacity: 0;
+  }
+}
+
+.shining-stars {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background-image: 
+    radial-gradient(2px 2px at 15% 25%, rgba(255, 255, 255, 1) 100%, transparent),
+    radial-gradient(2px 2px at 45% 55%, rgba(255, 255, 255, 1) 100%, transparent),
+    radial-gradient(3px 3px at 75% 15%, rgba(255, 255, 255, 1) 100%, transparent),
+    radial-gradient(2px 2px at 85% 75%, rgba(255, 255, 255, 1) 100%, transparent);
+  background-size: 250px 250px, 350px 350px, 450px 450px, 200px 200px;
+  background-position: 0 0;
+  z-index: -1;
+  pointer-events: none;
+  animation: moveShiningStars 15s linear infinite, shineStars 2s ease-in-out infinite alternate;
+}
+
+@keyframes moveShiningStars {
+  from {
+    background-position: 0 0, 0 0, 0 0, 0 0;
+  }
+  to {
+    background-position: -250px 0, -350px 0, -450px 0, -200px 0;
+  }
+}
+
+@keyframes shineStars {
+  0% { opacity: 0.1; filter: drop-shadow(0 0 2px rgba(255,255,255,0.5)); }
+  100% { opacity: 1; filter: drop-shadow(0 0 8px rgba(255,255,255,1)); }
 }
 
 /* Floating notification animation */
