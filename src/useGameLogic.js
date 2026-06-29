@@ -1,10 +1,49 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { audioManager } from './audioManager';
 
-export const useGameLogic = (levelData, onVictory, onRestart) => {
+const guidanceData = {
+  1: [
+    "First things first: we need to get across.",
+    "Take the stone and place it above the floor button to open the tube slider."
+  ],
+  2: [
+    "That trampolin looks useful.",
+    "Use it to throw the stone into the other land."
+  ],
+  3: [
+    "It's time for some programming.",
+    "Go ahead and figure out how to activate the bridge."
+  ],
+  4: [
+    "Looks like the bridge is locked.",
+    "Program the robot to pick up the stone and drop it on the podium!"
+  ],
+  5: [
+    "This time, there are multiple robots.",
+    "You'll need to write code for both of them to get across."
+  ],
+  6: [
+    "More robots, more problems.",
+    "Coordinate the robots to unlock all the bridges.",
+    "Tip: Robots are heavy enough to press floor buttons themselves!"
+  ],
+  7: [
+    "That podium is on a different island!",
+    "Program the robot to drop the stone on the trampoline to launch it over."
+  ],
+  8: [
+    "The final challenge.",
+    "Use everything you've learned to reach the portal. Good luck!",
+    "Remember: Robots can stand on floor buttons to keep them pressed."
+  ]
+};
+
+export const useGameLogic = (levelData, onVictory, onRestart, currentLevel, gameStarted) => {
   const [pos, setPos] = useState(levelData.startPos);
   const [dir, setDir] = useState({ dx: 1, dz: 0 });
   const [gameState, setGameState] = useState('PLAYING');
+  const [guidanceStep, setGuidanceStep] = useState(0);
+  const [isGuidanceReady, setIsGuidanceReady] = useState(false);
   const [stones, setStones] = useState(levelData.stones);
   const [carriedStoneId, setCarriedStoneId] = useState(null);
   const [bouncingStones, setBouncingStones] = useState({});
@@ -28,6 +67,7 @@ export const useGameLogic = (levelData, onVictory, onRestart) => {
     setPos(levelData.startPos);
     setDir({ dx: 1, dz: 0 });
     setGameState('PLAYING');
+    setGuidanceStep(0);
     setStones(levelData.stones);
     setCarriedStoneId(null);
     setBouncingStones({});
@@ -48,6 +88,16 @@ export const useGameLogic = (levelData, onVictory, onRestart) => {
   useEffect(() => {
     resetLevel();
   }, [resetLevel]);
+
+  // Delay guidance appearance until camera animation finishes
+  useEffect(() => {
+    setIsGuidanceReady(false);
+    if (!gameStarted) return;
+    const t = setTimeout(() => {
+      setIsGuidanceReady(true);
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [levelData, gameStarted]);
 
   const isBaseTileValid = useCallback((x, z) => {
     return levelData.islands.some(island => 
@@ -533,10 +583,21 @@ export const useGameLogic = (levelData, onVictory, onRestart) => {
   }, [openBridges, levelData.bridges]);
 
   useEffect(() => {
+    const currentGuidance = guidanceData[currentLevel] || [];
+    const showGuidance = isGuidanceReady && guidanceStep < currentGuidance.length;
+    const isGuidanceActive = showGuidance && gameState === 'PLAYING';
+
     const handleKeyDown = (e) => {
       audioManager.init();
       if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' ','escape','p'].includes(e.key.toLowerCase())) {
         e.preventDefault();
+      }
+
+      if (isGuidanceActive) {
+        if (e.key === ' ' || e.key === 'Enter') {
+          setGuidanceStep(prev => prev + 1);
+        }
+        return;
       }
       
       if (codingMode) {
@@ -560,13 +621,18 @@ export const useGameLogic = (levelData, onVictory, onRestart) => {
     };
     window.addEventListener('keydown', handleKeyDown, { passive: false });
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [move, handleSpace, codingMode, isRobotRunning]);
+  }, [move, handleSpace, codingMode, isRobotRunning, guidanceStep, currentLevel, gameState, isGuidanceReady]);
+
+  const currentGuidance = guidanceData[currentLevel] || [];
+  const showGuidance = isGuidanceReady && guidanceStep < currentGuidance.length;
 
   return {
     pos, dir, gameState, stones, bouncingStones, carriedStoneId,
     nearbyStoneId, nearbyPodium, openBridges, isAtPortal,
     nearbyComputer, codingMode, setCodingMode,
     robotPositions, activeRobotId, robotCommands, setRobotCommands,
-    isRobotRunning, runRobotProgram, robotCarriedStones, fallingRobots
+    isRobotRunning, runRobotProgram, robotCarriedStones, fallingRobots,
+    move, handleSpace,
+    showGuidance, currentGuidance, guidanceStep, setGuidanceStep, guidanceData
   };
 };

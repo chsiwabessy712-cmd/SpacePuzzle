@@ -6,11 +6,32 @@ import { useSpring, animated } from '@react-spring/three';
 import { useGameLogic } from './useGameLogic';
 import { generateLevel } from './levelGenerator';
 import { audioManager } from './audioManager';
+import kinderImg from './assets/kinder.png';
+import juniorImg from './assets/junior.png';
+import coderImg from './assets/coder.png';
+import heroImg from './assets/hero.png';
 import './index.css';
 
 // ----------------------------------------------------------------------------
 // Components
 // ----------------------------------------------------------------------------
+
+const TypingText = ({ text }) => {
+  const [displayedText, setDisplayedText] = useState('');
+  
+  useEffect(() => {
+    setDisplayedText('');
+    let i = 0;
+    const interval = setInterval(() => {
+      i++;
+      setDisplayedText(text.slice(0, i));
+      if (i >= text.length) clearInterval(interval);
+    }, 25);
+    return () => clearInterval(interval);
+  }, [text]);
+
+  return <span>{displayedText}</span>;
+};
 
 const Island = ({ xStart, zStart, w, d }) => {
   const caps = [];
@@ -133,19 +154,30 @@ const StoneBlock = ({ x, z, isCarried, isRobotCarried, bounceState, isOnPodium, 
   );
 };
 
-const Trampoline = ({ position }) => (
-  <group position={position}>
-    <mesh position={[0, 0.05, 0]} rotation={[-Math.PI/2, 0, Math.PI]}>
-      <circleGeometry args={[0.5, 3]} />
-      <meshStandardMaterial color="#ff8c00" roughness={0.2} />
-      <Edges color="#ffffff" />
-    </mesh>
-    <mesh position={[0, 0.06, 0]} rotation={[-Math.PI/2, 0, Math.PI]}>
-      <circleGeometry args={[0.3, 3]} />
-      <meshStandardMaterial color="#3399ff" emissive="#1155aa" emissiveIntensity={0.5} roughness={0.1} />
-    </mesh>
-  </group>
-);
+const Trampoline = ({ position }) => {
+  const meshRef = useRef();
+
+  useFrame((state) => {
+    if (meshRef.current) {
+      const scale = 1 + Math.sin(state.clock.elapsedTime * 6) * 0.15;
+      meshRef.current.scale.setScalar(scale);
+    }
+  });
+
+  return (
+    <group position={position}>
+      <mesh position={[0, 0.1, 0]} rotation={[0, -Math.PI/2, 0]}>
+        <cylinderGeometry args={[0.4, 0.5, 0.1, 3]} />
+        <meshStandardMaterial color="#ff8c00" roughness={0.2} />
+        <Edges color="#ffffff" />
+      </mesh>
+      <mesh ref={meshRef} position={[0, 0.17, 0]} rotation={[0, -Math.PI/2, 0]}>
+        <cylinderGeometry args={[0.3, 0.35, 0.05, 3]} />
+        <meshStandardMaterial color="#3399ff" emissive="#1155aa" emissiveIntensity={0.5} roughness={0.1} />
+      </mesh>
+    </group>
+  );
+};
 
 const Computer = ({ position }) => (
   <group position={position}>
@@ -612,6 +644,19 @@ const CameraController = ({ isVictory, targetPos, arenaCenter }) => {
 // ----------------------------------------------------------------------------
 
 function App() {
+  const [gameStarted, setGameStarted] = useState(false);
+  const [menuPhase, setMenuPhase] = useState('main');
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  
+  const [masterVol, setMasterVol] = useState(audioManager.masterVolume);
+  const [musicVol, setMusicVol] = useState(audioManager.musicVolume);
+  const [sfxVol, setSfxVol] = useState(audioManager.sfxVolume);
+
+  useEffect(() => {
+    audioManager.setVolumes(masterVol, musicVol, sfxVol);
+  }, [masterVol, musicVol, sfxVol]);
+
   const [isMuted, setIsMuted] = useState(() => audioManager.isMuted);
 
   const toggleMute = () => {
@@ -640,14 +685,14 @@ function App() {
 
   const handleVictory = () => {
     let nextLvl = currentLevel + 1;
+    if (nextLvl > maxUnlockedLevel) {
+      setMaxUnlockedLevel(nextLvl);
+      localStorage.setItem('puzzleArenaMaxLevel', nextLvl.toString());
+    }
     if (nextLvl > MAX_LEVEL) {
       nextLvl = 1;
     }
     setCurrentLevel(nextLvl);
-    if (nextLvl > maxUnlockedLevel && nextLvl <= MAX_LEVEL) {
-      setMaxUnlockedLevel(nextLvl);
-      localStorage.setItem('puzzleArenaMaxLevel', nextLvl.toString());
-    }
     localStorage.setItem('puzzleArenaLevel', nextLvl.toString());
   };
 
@@ -656,8 +701,10 @@ function App() {
     nearbyStoneId, nearbyPodium, openBridges, isAtPortal,
     nearbyComputer, codingMode, setCodingMode,
     robotPositions, activeRobotId, robotCommands, setRobotCommands,
-    isRobotRunning, runRobotProgram, robotCarriedStones, fallingRobots
-  } = useGameLogic(levelData, handleVictory, handleRestart);
+    isRobotRunning, runRobotProgram, robotCarriedStones, fallingRobots,
+    move, handleSpace,
+    showGuidance, currentGuidance, guidanceStep, setGuidanceStep, guidanceData
+  } = useGameLogic(levelData, handleVictory, handleRestart, currentLevel, gameStarted);
 
   const [targetPickerType, setTargetPickerType] = useState(null);
   const maxLines = 10;
@@ -687,6 +734,252 @@ function App() {
     return hasStone || hasRobot;
   };
 
+  if (!gameStarted) {
+    return (
+      <>
+        <div className="shining-stars"></div>
+        <div style={{
+          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          fontFamily: 'sans-serif', zIndex: 1000, pointerEvents: 'auto', userSelect: 'none'
+        }}>
+           {menuPhase === 'main' ? (
+             <>
+               {/* Reset Confirmation Modal */}
+               {showResetConfirm && (
+                 <div style={{
+                   position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+                   background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center',
+                   zIndex: 2000
+                 }}>
+                   <div style={{
+                     background: 'rgba(26, 26, 68, 0.95)', border: '2px solid #00f3ff', borderRadius: '16px', padding: 'clamp(20px, 5vw, 40px)',
+                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '30px', width: '90%', maxWidth: '500px',
+                     boxShadow: '0 0 30px rgba(0, 243, 255, 0.4)'
+                   }}>
+                     <h2 style={{ color: 'white', margin: 0, fontSize: '24px', textAlign: 'center', textShadow: '0 0 10px rgba(255,255,255,0.5)' }}>
+                       Are you sure you want to reset your progress?
+                     </h2>
+                     <div style={{ display: 'flex', gap: '20px' }}>
+                       <button onClick={() => {
+                         localStorage.removeItem('puzzleArenaLevel');
+                         localStorage.removeItem('puzzleArenaMaxLevel');
+                         setCurrentLevel(1);
+                         setMaxUnlockedLevel(1);
+                         setShowResetConfirm(false);
+                         audioManager.init();
+                       }} style={{
+                         background: '#ff3366', color: 'white', border: 'none', borderRadius: '12px', padding: '12px 40px',
+                         fontSize: '20px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 6px 0 #cc0044',
+                         transition: 'transform 0.1s'
+                       }} onMouseEnter={() => audioManager.playHoverSound()} onMouseDown={(e) => e.target.style.transform = 'translateY(6px)'} onMouseUp={(e) => e.target.style.transform = 'none'} onMouseLeave={(e) => e.target.style.transform = 'none'}>
+                         Yes, Reset
+                       </button>
+                       <button onClick={() => setShowResetConfirm(false)} style={{
+                         background: '#6b66d6', color: 'white', border: 'none', borderRadius: '12px', padding: '12px 40px',
+                         fontSize: '20px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 6px 0 #4a45a3',
+                         transition: 'transform 0.1s'
+                       }} onMouseEnter={() => audioManager.playHoverSound()} onMouseDown={(e) => e.target.style.transform = 'translateY(6px)'} onMouseUp={(e) => e.target.style.transform = 'none'} onMouseLeave={(e) => e.target.style.transform = 'none'}>
+                         Cancel
+                       </button>
+                     </div>
+                   </div>
+                 </div>
+               )}
+
+               {/* Settings Modal */}
+               {showSettings && (
+                 <div style={{
+                   position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+                   background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center',
+                   zIndex: 2000
+                 }}>
+                   <div style={{
+                      background: 'rgba(26, 26, 68, 0.95)', border: '2px solid #00f3ff', borderRadius: '16px', padding: 'clamp(20px, 5vw, 40px)',
+                      display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '30px', width: '90%', maxWidth: '500px',
+                      boxShadow: '0 0 30px rgba(0, 243, 255, 0.4)'
+                    }}>
+                     <h2 style={{ color: 'white', margin: 0, fontSize: '32px', textAlign: 'center', textShadow: '0 0 10px rgba(255,255,255,0.5)' }}>
+                       Settings
+                     </h2>
+                     
+                     <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                         <span style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>Master Volume</span>
+                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                           <input type="range" min="0" max="1" step="0.05" value={masterVol} onChange={(e) => setMasterVol(parseFloat(e.target.value))} style={{ width: '150px', cursor: 'pointer' }} />
+                           <span style={{ color: '#00f3ff', width: '45px', textAlign: 'right', fontWeight: 'bold' }}>{Math.round(masterVol * 100)}%</span>
+                         </div>
+                       </div>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                         <span style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>Music Volume</span>
+                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                           <input type="range" min="0" max="1" step="0.05" value={musicVol} onChange={(e) => setMusicVol(parseFloat(e.target.value))} style={{ width: '150px', cursor: 'pointer' }} />
+                           <span style={{ color: '#00f3ff', width: '45px', textAlign: 'right', fontWeight: 'bold' }}>{Math.round(musicVol * 100)}%</span>
+                         </div>
+                       </div>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                         <span style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>SFX Volume</span>
+                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                           <input type="range" min="0" max="1" step="0.05" value={sfxVol} onChange={(e) => setSfxVol(parseFloat(e.target.value))} style={{ width: '150px', cursor: 'pointer' }} />
+                           <span style={{ color: '#00f3ff', width: '45px', textAlign: 'right', fontWeight: 'bold' }}>{Math.round(sfxVol * 100)}%</span>
+                         </div>
+                       </div>
+                     </div>
+
+                     <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+                       <button onClick={() => setShowSettings(false)} style={{
+                         background: '#6b66d6', color: 'white', border: 'none', borderRadius: '12px', padding: '12px 40px',
+                         fontSize: '20px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 6px 0 #4a45a3',
+                         transition: 'transform 0.1s'
+                       }} onMouseEnter={() => audioManager.playHoverSound()} onMouseDown={(e) => e.target.style.transform = 'translateY(6px)'} onMouseUp={(e) => e.target.style.transform = 'none'} onMouseLeave={(e) => e.target.style.transform = 'none'}>
+                         Close
+                       </button>
+                     </div>
+                   </div>
+                 </div>
+               )}
+               
+               {/* Floating Icons (using Emojis to simulate the characters in the reference) */}
+               <div style={{ position: 'absolute', top: '15%', left: '15%', fontSize: '100px', filter: 'drop-shadow(0 10px 15px rgba(0,0,0,0.5))', animation: 'float 4s ease-in-out infinite' }}>🤖</div>
+               <div style={{ position: 'absolute', top: '25%', right: '15%', fontSize: '100px', filter: 'drop-shadow(0 10px 15px rgba(0,0,0,0.5))', animation: 'float 3s ease-in-out infinite alternate' }}>🧊</div>
+               
+               {/* Bottom Right Characters */}
+               <div style={{ position: 'absolute', bottom: '15%', right: '15%', display: 'flex', gap: '20px', fontSize: '100px', filter: 'drop-shadow(0 10px 15px rgba(0,0,0,0.5))', animation: 'float 5s ease-in-out infinite' }}>
+                 🚀
+               </div>
+
+               {/* Left Bottom STEAM Banner */}
+               <div style={{ 
+                 position: 'absolute', bottom: 'clamp(10px, 5%, 15%)', left: 'clamp(10px, 5%, 10%)',
+                 background: '#00d18b', border: 'clamp(4px, 1vw, 12px) solid #a9b5c9', borderRadius: 'clamp(20px, 3vw, 40px)',
+                 padding: 'clamp(10px, 2vw, 15px) clamp(20px, 4vw, 40px)', color: 'white', display: 'flex', alignItems: 'center', gap: '15px',
+                 boxShadow: '0 10px 30px rgba(0,0,0,0.5)', animation: 'float 6s ease-in-out infinite',
+                 transformOrigin: 'bottom left', transform: 'scale(clamp(0.6, 1vw + 0.5, 1))'
+               }}>
+                 <div style={{ fontSize: '50px' }}>🎮</div>
+                 <div style={{ display: 'flex', flexDirection: 'column', fontWeight: '900', fontSize: '32px', lineHeight: '1.1', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>
+                   <span>The Lab</span>
+                   <span>Indonesia</span>
+                 </div>
+                 {/* Decorator pipe top */}
+                 <div style={{ position: 'absolute', top: '-40px', left: '40px', width: '24px', height: '40px', background: '#a9b5c9', borderRadius: '12px 12px 0 0' }}>
+                   <div style={{ width: '100%', height: '10px', background: '#00f3ff', marginTop: '15px', boxShadow: '0 0 15px #00f3ff' }}></div>
+                 </div>
+                 {/* Decorator pipe bottom */}
+                 <div style={{ position: 'absolute', bottom: '-24px', left: '120px', width: '50px', height: '24px', background: '#a9b5c9', borderRadius: '0 0 12px 12px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}>
+                    <div style={{width: '8px', height: '12px', background: '#000', opacity: 0.2, borderRadius: '4px'}}></div>
+                    <div style={{width: '8px', height: '12px', background: '#000', opacity: 0.2, borderRadius: '4px'}}></div>
+                 </div>
+               </div>
+
+               {/* Title */}
+               <div style={{ textAlign: 'center', marginBottom: '50px', position: 'relative' }}>
+                 <h1 style={{ 
+                   fontSize: 'clamp(3rem, 10vw, 6rem)', margin: 0, lineHeight: '0.9', color: 'white', 
+                   fontStyle: 'italic', fontWeight: '900', transform: 'rotate(-5deg)',
+                   WebkitTextStroke: 'clamp(2px, 1vw, 6px) #1a1a3a', letterSpacing: '4px',
+                   fontFamily: 'Impact, sans-serif'
+                 }}>
+                   Monkey In<br/>The Space
+                 </h1>
+                 <div style={{ position: 'absolute', top: '-30px', right: '-40px', fontSize: '50px', transform: 'rotate(15deg)' }}>✨</div>
+               </div>
+
+               {/* Menu Box */}
+               <div style={{ 
+                 background: 'rgba(26, 26, 68, 0.95)', padding: 'clamp(20px, 5vw, 50px) clamp(40px, 10vw, 100px)', borderRadius: '16px', 
+                 display: 'flex', flexDirection: 'column', gap: '30px', alignItems: 'center',
+                 boxShadow: '0 15px 40px rgba(0,0,0,0.7)', border: '2px solid rgba(255,255,255,0.05)'
+               }}>
+                 <button onClick={() => { audioManager.init(); setMenuPhase('sub'); }} onMouseEnter={() => audioManager.playHoverSound()} className="menu-btn">START GAME</button>
+                 <button onClick={() => setShowResetConfirm(true)} onMouseEnter={() => audioManager.playHoverSound()} className="menu-btn">RESET PROGRESS</button>
+                 <button onClick={() => setShowSettings(true)} onMouseEnter={() => audioManager.playHoverSound()} className="menu-btn">SETTINGS</button>
+               </div>
+             </>
+           ) : (
+             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '40px', zIndex: 10, width: '100%', padding: '0 20px' }}>
+               <div style={{ display: 'flex', gap: '30px', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                 {/* Card 1 */}
+                 <div 
+                   className="level-card"
+                   onMouseEnter={() => audioManager.playHoverSound()}
+                   onClick={() => setGameStarted(true)}
+                   style={{
+                     background: '#e4eef6', borderRadius: '24px', padding: '20px', width: '280px', height: '360px',
+                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between',
+                     cursor: 'pointer'
+                   }}
+                 >
+                   <div style={{ background: '#0b3a53', color: '#00f3ff', padding: '12px 20px', borderRadius: '16px', fontWeight: 'bold', width: '90%', textAlign: 'center', fontSize: '1.2rem' }}>
+                     1. Kinder Level
+                   </div>
+                   <img src={kinderImg} alt="Kinder Level" style={{ height: '200px', objectFit: 'contain' }} />
+                   <div style={{ background: '#9fa8c3', color: 'white', padding: '10px 20px', borderRadius: '16px', fontWeight: 'bold', width: '70%', textAlign: 'center', fontSize: '1.1rem' }}>
+                     Completed :<br/>{Math.min(maxUnlockedLevel - 1, 8)} / 8
+                   </div>
+                 </div>
+
+                 {/* Card 2 */}
+                 <div 
+                   style={{
+                     background: '#d8dbdf', borderRadius: '24px', padding: '20px', width: '280px', height: '360px',
+                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between',
+                     boxShadow: '0 10px 20px rgba(0,0,0,0.2)', cursor: 'not-allowed'
+                   }}>
+                   <div style={{ background: '#6c757d', color: '#ced4da', padding: '12px 20px', borderRadius: '16px', fontWeight: 'bold', width: '90%', textAlign: 'center', fontSize: '1.2rem' }}>
+                     2. Junior Level
+                   </div>
+                   <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px', width: '100%' }}>
+                     <img src={juniorImg} alt="Junior Level" style={{ height: '100%', objectFit: 'contain', filter: 'grayscale(100%) opacity(50%)' }} />
+                     <div style={{ position: 'absolute', fontSize: '60px', textShadow: '0 4px 10px rgba(0,0,0,0.5)' }}>🔒</div>
+                   </div>
+                   <div style={{ background: '#adb5bd', color: '#e9ecef', padding: '10px 20px', borderRadius: '16px', fontWeight: 'bold', width: '70%', textAlign: 'center', fontSize: '1.1rem' }}>
+                     Completed :<br/>0 / 8
+                   </div>
+                 </div>
+
+                 {/* Card 3 */}
+                 <div 
+                   style={{
+                     background: '#d8dbdf', borderRadius: '24px', padding: '20px', width: '280px', height: '360px',
+                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between',
+                     boxShadow: '0 10px 20px rgba(0,0,0,0.2)', cursor: 'not-allowed'
+                   }}>
+                   <div style={{ background: '#6c757d', color: '#ced4da', padding: '12px 20px', borderRadius: '16px', fontWeight: 'bold', width: '90%', textAlign: 'center', fontSize: '1.2rem' }}>
+                     3. Coder Level
+                   </div>
+                   <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px', width: '100%' }}>
+                     <img src={coderImg} alt="Coder Level" style={{ height: '100%', objectFit: 'contain', filter: 'grayscale(100%) opacity(50%)' }} />
+                     <div style={{ position: 'absolute', fontSize: '60px', textShadow: '0 4px 10px rgba(0,0,0,0.5)' }}>🔒</div>
+                   </div>
+                   <div style={{ background: '#adb5bd', color: '#e9ecef', padding: '10px 20px', borderRadius: '16px', fontWeight: 'bold', width: '70%', textAlign: 'center', fontSize: '1.1rem' }}>
+                     Completed :<br/>0 / 8
+                   </div>
+                 </div>
+               </div>
+
+               <button 
+                 onClick={() => setMenuPhase('main')}
+                 onMouseEnter={() => audioManager.playHoverSound()}
+                 className="back-btn"
+               >
+                 Back
+               </button>
+             </div>
+           )}
+
+           {/* Footer */}
+           {menuPhase === 'main' && (
+             <div style={{ position: 'absolute', bottom: '20px', textAlign: 'center', fontSize: '14px', color: 'white', fontWeight: 'bold', opacity: 0.8 }}>
+               Beta Version<br/>Andarinyo 2024
+             </div>
+           )}
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <div className="ui-layer" style={{ pointerEvents: 'none', position: 'absolute', zIndex: 10, width: '100%', height: '100%' }}>
@@ -702,8 +995,10 @@ function App() {
                 }}
                 style={{ background: 'transparent', color: 'white', border: 'none', outline: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
               >
-                {Array.from({ length: Math.min(maxUnlockedLevel, MAX_LEVEL) }, (_, i) => i + 1).map(l => (
-                  <option key={l} value={l} style={{ color: 'black' }}>Level {l}</option>
+                {Array.from({ length: MAX_LEVEL }, (_, i) => i + 1).map(l => (
+                  <option key={l} value={l} style={{ color: 'black' }} disabled={l > maxUnlockedLevel}>
+                    Level {l} {l > maxUnlockedLevel ? '🔒' : ''}
+                  </option>
                 ))}
               </select>
             </div>
@@ -727,17 +1022,158 @@ function App() {
             </button>
           </div>
           <h1 style={{ margin: 0, textShadow: '0 0 10px #00f3ff', color: '#00f3ff', fontSize: '2rem', letterSpacing: '2px', textTransform: 'uppercase' }}>PUZZLE ARENA</h1>
-          <div className="stat-box" style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid #00f3ff', padding: '10px 20px', borderRadius: '8px', color: 'white', fontSize: '1.2rem' }}>Level: {currentLevel}</div>
+          <div style={{ display: 'flex', gap: '10px', pointerEvents: 'auto' }}>
+            {!codingMode && (
+              <button 
+                onClick={() => setGameStarted(false)}
+                style={{
+                  background: 'rgba(0,0,0,0.5)', border: '1px solid #ff3366', padding: '10px 15px', borderRadius: '8px', color: 'white', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}
+                title="Back to Menu"
+              >
+                Back to Menu
+              </button>
+            )}
+            <div className="stat-box" style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid #00f3ff', padding: '10px 20px', borderRadius: '8px', color: 'white', fontSize: '1.2rem' }}>Level: {currentLevel}</div>
+          </div>
         </div>
         <div style={{ position: 'absolute', bottom: '20px', width: '100%', textAlign: 'center', color: 'rgba(255,255,255,0.8)' }}>
           Use W A S D or Arrow Keys to Move
         </div>
+
+        {/* Game UI Layer - Left Compass and Action Button */}
+        {!codingMode && (
+          <div style={{ position: 'absolute', bottom: 'clamp(20px, 5vh, 60px)', left: 'clamp(20px, 5vw, 60px)', display: 'flex', alignItems: 'center', gap: 'clamp(15px, 2vw, 30px)', pointerEvents: 'none', transformOrigin: 'bottom left', transform: 'scale(clamp(0.7, 1vw + 0.5, 1))' }}>
+            {/* The Compass */}
+            <div style={{ width: '120px', height: '120px' }}>
+              <div style={{
+                position: 'relative', width: '100%', height: '100%',
+                background: 'rgba(26,26,68,0.6)', border: '2px solid rgba(107,102,214,0.5)', borderRadius: '50%',
+                boxShadow: '0 8px 20px rgba(0,0,0,0.6)'
+              }}>
+                {/* Center Cross */}
+                <div style={{ position: 'absolute', top: '50%', left: '50%', width: '90px', height: '1px', background: 'rgba(255,255,255,0.2)', transform: 'translate(-50%, -50%) rotate(45deg)' }}></div>
+                <div style={{ position: 'absolute', top: '50%', left: '50%', width: '90px', height: '1px', background: 'rgba(255,255,255,0.2)', transform: 'translate(-50%, -50%) rotate(-45deg)' }}></div>
+                
+                {/* F (Top Left) */}
+                <div style={{ position: 'absolute', top: '15px', left: '15px', color: '#ff3366', fontWeight: 'bold', fontSize: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>F</span>
+                  <span>↖</span>
+                </div>
+                {/* R (Top Right) */}
+                <div style={{ position: 'absolute', top: '15px', right: '15px', color: '#ff3366', fontWeight: 'bold', fontSize: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>R</span>
+                  <span>↙</span>
+                </div>
+                {/* L (Bottom Left) */}
+                <div style={{ position: 'absolute', bottom: '15px', left: '15px', color: '#ff3366', fontWeight: 'bold', fontSize: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <span>↗</span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>L</span>
+                </div>
+                {/* B (Bottom Right) */}
+                <div style={{ position: 'absolute', bottom: '15px', right: '15px', color: '#ff3366', fontWeight: 'bold', fontSize: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <span>↘</span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>B</span>
+                </div>
+              </div>
+            </div>
+
+            {/* SPACE/ACTION */}
+            <button 
+              onClick={() => {
+                if (showGuidance) {
+                  setGuidanceStep(prev => prev + 1);
+                } else {
+                  audioManager.init(); handleSpace();
+                }
+              }}
+              onMouseEnter={() => audioManager.playHoverSound()}
+              style={{ width: '160px', padding: '12px', borderRadius: '16px', background: '#ff3366', border: 'none', color: 'white', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer', transition: 'transform 0.1s', boxShadow: '0 4px 0 #cc0044', pointerEvents: 'auto' }}
+              onMouseDown={(e) => e.target.style.transform = 'translateY(4px)'} onMouseUp={(e) => e.target.style.transform = 'none'} onMouseLeave={(e) => e.target.style.transform = 'none'}
+            >
+              PRESS TO ACT
+            </button>
+          </div>
+        )}
+
+        {/* Game UI Layer - Right Controller */}
+        {!codingMode && (
+          <div style={{ position: 'absolute', bottom: 'clamp(20px, 5vh, 40px)', right: 'clamp(20px, 5vw, 40px)', display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'auto' }}>
+            <div className="dpad-container">
+              {/* UP */}
+              <div 
+                className="dpad-btn up"
+                onClick={() => { audioManager.init(); move(-1, 0); }}
+                onMouseEnter={() => audioManager.playHoverSound()}
+              >
+                <div className="dpad-chevron"></div>
+              </div>
+              
+              {/* LEFT */}
+              <div 
+                className="dpad-btn left"
+                onClick={() => { audioManager.init(); move(0, 1); }}
+                onMouseEnter={() => audioManager.playHoverSound()}
+              >
+                <div className="dpad-chevron"></div>
+              </div>
+              
+              {/* RIGHT */}
+              <div 
+                className="dpad-btn right"
+                onClick={() => { audioManager.init(); move(0, -1); }}
+                onMouseEnter={() => audioManager.playHoverSound()}
+              >
+                <div className="dpad-chevron"></div>
+              </div>
+              
+              {/* DOWN */}
+              <div 
+                className="dpad-btn down"
+                onClick={() => { audioManager.init(); move(1, 0); }}
+                onMouseEnter={() => audioManager.playHoverSound()}
+              >
+                <div className="dpad-chevron"></div>
+              </div>
+
+              {/* Center Dot */}
+              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '16px', height: '16px', borderRadius: '50%', background: 'rgba(107,102,214,0.3)', pointerEvents: 'none' }}></div>
+            </div>
+          </div>
+        )}
         {gameState === 'FALLING' && (
           <div className="overlay lost" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(0,0,0,0.8)', padding: '40px', borderRadius: '20px' }}>
             <h2 style={{ color: '#ff0055', textShadow: '0 0 20px #ff0055', margin: 0, fontSize: '3rem' }}>GAME OVER</h2>
           </div>
         )}
       </div>
+
+      {/* Guidance Popup */}
+      {showGuidance && currentGuidance[guidanceStep] && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+          display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 30,
+          background: 'rgba(0,0,0,0.5)', pointerEvents: 'auto'
+        }}>
+          <div className="guidance-popup">
+            <div className="guidance-avatar-container">
+              <div className="guidance-avatar">
+                <img src={currentLevel <= 8 ? kinderImg : heroImg} alt="Atom" />
+              </div>
+              <div className="guidance-name">Atom</div>
+            </div>
+            <div className="guidance-content">
+              <span className="guidance-icon">⚇</span>
+              <span className="guidance-text">
+                <TypingText text={currentGuidance[guidanceStep]} />
+              </span>
+            </div>
+            <div className="guidance-footer">
+              <div className="guidance-space-btn" onClick={() => setGuidanceStep(prev => prev + 1)}>space</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Block Coding Overlay */}
       {codingMode && (
@@ -828,9 +1264,9 @@ function App() {
                   background: '#7e57c2', borderRadius: '12px', padding: '15px', display: 'flex', flexDirection: 'column', gap: '12px'
                 }}>
                   <div style={{ color: 'white', fontWeight: 'bold', fontSize: '14px', marginBottom: '5px' }}>Pick a target</div>
-                  <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div className="target-list" style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto', paddingRight: '5px' }}>
                     {levelData.robotButtons?.map(rb => (
-                      <div key={rb.id} className="scratch-target" draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'target', targetId: rb.id, label: `Button ${rb.label}` }))} style={{ marginLeft: 0 }}>
+                      <div key={rb.id} className="scratch-target" draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'target', targetId: rb.id, label: `Button ${rb.label}` }))} style={{ marginLeft: 12 }}>
                         <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#ff3366', borderRadius: '50%', marginRight: '6px' }}></span>
                         "Button {rb.label}"
                       </div>
@@ -842,7 +1278,7 @@ function App() {
                       const isOnPodium = levelData.buttons.some(b => b.type === 'podium' && b.x === cx && b.z === cz);
                       if (isOnPodium) return null;
                       return (
-                        <div key={item.id} className="scratch-target" draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'target', targetId: item.id, label: `Stone ${i + 1}` }))} style={{ marginLeft: 0 }}>
+                        <div key={item.id} className="scratch-target" draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'target', targetId: item.id, label: `Stone ${i + 1}` }))} style={{ marginLeft: 12 }}>
                           <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#e2e8f0', borderRadius: '2px', marginRight: '6px' }}></span>
                           "Stone {i + 1}"
                         </div>
@@ -852,14 +1288,14 @@ function App() {
                       const hasStone = stones.some(s => s.x === btn.x && s.z === btn.z);
                       if (hasStone) return null;
                       return (
-                        <div key={btn.id} className="scratch-target" draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'target', targetId: btn.id, label: `Podium ${btn.label}` }))} style={{ marginLeft: 0 }}>
+                        <div key={btn.id} className="scratch-target" draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'target', targetId: btn.id, label: `Podium ${btn.label}` }))} style={{ marginLeft: 12 }}>
                           <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#ff3366', borderRadius: '50%', marginRight: '6px' }}></span>
                           "Podium {btn.label}"
                         </div>
                       );
                     })}
                     {(levelData.trampolines || []).map((tramp, i) => (
-                      <div key={tramp.id} className="scratch-target" draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'target', targetId: tramp.id, label: `Trampoline ${i+1}` }))} style={{ marginLeft: 0 }}>
+                      <div key={tramp.id} className="scratch-target" draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'target', targetId: tramp.id, label: `Trampoline ${i+1}` }))} style={{ marginLeft: 12 }}>
                         <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#33ffaa', borderRadius: '50%', marginRight: '6px' }}></span>
                         "Trampoline {i+1}"
                       </div>
@@ -938,7 +1374,7 @@ function App() {
                            className="scratch-cmd"
                            draggable 
                            onDragStart={(e) => { e.dataTransfer.setData('application/json', JSON.stringify({ category: 'existing_command', id: cmd.id })); }}
-                           style={{ borderRadius: isComplete ? '4px 0 0 4px' : '4px', zIndex: 1, paddingRight: isComplete ? '20px' : '20px', minWidth: '80px' }}
+                           style={{ borderRadius: isComplete ? '4px 0 0 4px' : '4px', zIndex: 1, paddingRight: isComplete ? '28px' : '24px', minWidth: '80px' }}
                          >
                            {cmdText}
                            {!isComplete && <div className="scratch-hole-right" />}
@@ -969,7 +1405,7 @@ function App() {
                                "{targetLabel}"
                              </div>
                            ) : (
-                             <div style={{ marginLeft: '-4px', width: '60px', height: '36px', background: 'rgba(0,0,0,0.2)', border: '2px dashed rgba(255,255,255,0.3)', borderLeft: 'none', borderRadius: '0 4px 4px 0', zIndex: 0 }}></div>
+                             <div style={{ marginLeft: '-4px', width: '60px', height: '44px', background: 'rgba(0,0,0,0.2)', border: '2px dashed rgba(255,255,255,0.3)', borderLeft: 'none', borderRadius: '0 4px 4px 0', zIndex: 0 }}></div>
                            )}
                          </div>
                        </div>
@@ -1117,7 +1553,7 @@ function App() {
           nearbyComputer={nearbyComputer}
         />
 
-        {codingMode && currentLevel >= 4 && (levelData.stones || []).map((item, i) => {
+        {codingMode && currentLevel >= 3 && (levelData.stones || []).map((item, i) => {
           const currentStone = stones.find(s => s.id === item.id);
           const cx = currentStone ? currentStone.x : item.x;
           const cz = currentStone ? currentStone.z : item.z;
@@ -1137,7 +1573,7 @@ function App() {
           );
         })}
 
-        {codingMode && currentLevel >= 4 && (levelData.buttons?.filter(b => b.type === 'podium') || []).map((btn) => {
+        {codingMode && currentLevel >= 3 && (levelData.buttons?.filter(b => b.type === 'podium') || []).map((btn) => {
           const hasStone = stones.some(s => s.x === btn.x && s.z === btn.z);
           if (hasStone) return null;
           return (
@@ -1154,7 +1590,7 @@ function App() {
           );
         })}
 
-        {codingMode && currentLevel >= 4 && levelData.robotButtons?.map((rb) => (
+        {codingMode && currentLevel >= 3 && levelData.robotButtons?.map((rb) => (
           <Html key={`goto-label-${rb.id}`} position={[rb.x + 0.5, 1.5, rb.z + 0.5]} center sprite style={{ pointerEvents: 'none' }}>
             <div style={{
               background: 'rgba(0,0,0,0.8)', color: '#fff', padding: '4px 10px',
@@ -1163,6 +1599,19 @@ function App() {
               boxShadow: '0 4px 10px rgba(0,0,0,0.5)'
             }}>
               Button {rb.label}
+            </div>
+          </Html>
+        ))}
+
+        {codingMode && currentLevel >= 3 && levelData.trampolines?.map((tramp, i) => (
+          <Html key={`trampoline-label-${tramp.id}`} position={[tramp.x + 0.5, 1.5, tramp.z + 0.5]} center sprite style={{ pointerEvents: 'none' }}>
+            <div style={{
+              background: 'rgba(0,0,0,0.8)', color: '#fff', padding: '4px 10px',
+              borderRadius: '6px', fontSize: '14px', fontWeight: 'bold',
+              whiteSpace: 'nowrap', border: '2px solid #20e060',
+              boxShadow: '0 4px 10px rgba(0,0,0,0.5)'
+            }}>
+              Trampoline {i + 1}
             </div>
           </Html>
         ))}

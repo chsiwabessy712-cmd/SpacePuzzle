@@ -598,6 +598,17 @@ export function generateLevel(level) {
     
     // btn6 opens bridge3
     if (bridge3) bridge3.reqs.push('btn6');
+
+    // Add a trampoline on the starting land to throw stones back to the 2nd land
+    const startingIsland = islands[0];
+    const secondIsland = islands[1];
+    trampolines.push({
+      id: 'tramp_back',
+      x: startingIsland.xStart + 2,
+      z: startingIsland.zStart + 2,
+      targetX: secondIsland.xStart + 2,
+      targetZ: secondIsland.zStart + 2
+    });
   }
 
   return {
