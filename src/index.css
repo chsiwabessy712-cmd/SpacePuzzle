@@ -537,11 +537,11 @@ body::after {
     transform: scale(0.7) !important;
   }
   .level-card {
-    transform: scale(0.95) !important;
+    transform: scale(0.9) !important;
     margin: 0 -10px;
   }
   .level-card:hover {
-    transform: scale(1.0) !important;
+    transform: scale(0.95) !important;
   }
   .level-card-container {
     gap: 10px !important;
@@ -553,10 +553,6 @@ body::after {
     height: 133.33% !important;
     left: -16.66% !important;
     top: -16.66% !important;
-  }
-  .game-canvas {
-    transform: scale(0.85);
-    transform-origin: center center;
   }
 }
 
@@ -570,11 +566,11 @@ body::after {
     transform: scale(0.65) !important;
   }
   .level-card {
-    transform: scale(0.9) !important;
+    transform: scale(0.85) !important;
     margin: 0 -10px;
   }
   .level-card:hover {
-    transform: scale(0.95) !important;
+    transform: scale(0.9) !important;
   }
   .level-card-container {
     gap: 5px !important;
@@ -586,10 +582,6 @@ body::after {
     height: 153.84% !important;
     left: -26.92% !important;
     top: -26.92% !important;
-  }
-  .game-canvas {
-    transform: scale(0.8);
-    transform-origin: center center;
   }
 }
 

@@ -640,6 +640,10 @@ const CameraController = ({ isVictory, targetPos, arenaCenter, codingMode, activ
       if (minDim >= 768 && maxDim <= 1366) {
         // Tablet class device
         targetZoom *= 1.2;
+        if (window.innerWidth > window.innerHeight && window.innerHeight <= 700) {
+          // Cramped tablet landscape (like Chrome)
+          targetZoom *= 0.65;
+        }
       } else if (minDim < 768) {
         // Mobile class device
         targetZoom *= 0.7;
@@ -942,7 +946,7 @@ function App() {
                </div>
              </>
            ) : (
-             <div className="ui-layer" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '40px', zIndex: 10, width: '100%', padding: '0 20px' }}>
+             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '40px', zIndex: 10, width: '100%', padding: '0 20px' }}>
                <div className="level-card-container" style={{ display: 'flex', gap: '30px', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
                  {/* Card 1 */}
                  <div 
