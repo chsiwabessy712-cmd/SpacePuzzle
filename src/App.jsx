@@ -622,17 +622,45 @@ const Character = ({ x, z, dx, dz, isFalling, isFlying, isPreFlying, isDizzy, is
   );
 };
 
-const CameraController = ({ isVictory, targetPos, arenaCenter }) => {
+const CameraController = ({ isVictory, targetPos, arenaCenter, codingMode, activeRobotPos }) => {
   useFrame((state) => {
     if (isVictory) {
       state.camera.zoom = THREE.MathUtils.lerp(state.camera.zoom, 180, 0.05);
       state.camera.position.lerp(new THREE.Vector3(targetPos.x + 8, 8, targetPos.z + 8), 0.05);
       state.camera.lookAt(targetPos.x, 0.5, targetPos.z);
     } else {
+      let targetZoom = arenaCenter.zoom;
+      let targetX = arenaCenter.x;
+      let targetZ = arenaCenter.z;
+      
+      // Responsive zoom adjustments based on physical device class
+      const minDim = Math.min(window.innerWidth, window.innerHeight);
+      const maxDim = Math.max(window.innerWidth, window.innerHeight);
+      
+      if (minDim >= 768 && maxDim <= 1366) {
+        // Tablet class device
+        targetZoom *= 1.2;
+      } else if (minDim < 768) {
+        // Mobile class device
+        targetZoom *= 0.7;
+      }
+      
+      // Always pan camera right (+X, -Z) to shift scene left when coding, revealing targets under UI
+      // Strictly disabled for desktop (maxDim > 1366) per user request
+      if (codingMode && maxDim <= 1366) {
+        if (activeRobotPos) {
+          targetX = activeRobotPos.x;
+          targetZ = activeRobotPos.z;
+          targetZoom *= 1.3;
+        }
+        targetX += 3;
+        targetZ -= 3;
+      }
+      
       // Smoothly zoom based on the dynamically calculated arena zoom
-      state.camera.zoom = THREE.MathUtils.lerp(state.camera.zoom, arenaCenter.zoom, 0.05);
-      state.camera.position.lerp(new THREE.Vector3(arenaCenter.x + 50, 50, arenaCenter.z + 50), 0.05);
-      state.camera.lookAt(arenaCenter.x, 0, arenaCenter.z);
+      state.camera.zoom = THREE.MathUtils.lerp(state.camera.zoom, targetZoom, 0.05);
+      state.camera.position.lerp(new THREE.Vector3(targetX + 50, 50, targetZ + 50), 0.05);
+      state.camera.lookAt(state.camera.position.x - 50, 0, state.camera.position.z - 50);
     }
     state.camera.updateProjectionMatrix();
   });
@@ -733,12 +761,28 @@ function App() {
     const hasRobot = Object.values(robotPositions).some(rPos => rPos.x === bx && rPos.z === bz);
     return hasStone || hasRobot;
   };
+  const getIslandId = (x, z) => {
+    const rx = Math.round(x);
+    const rz = Math.round(z);
+    const island = levelData.islands.find(isl => 
+      rx >= isl.xStart && rx < isl.xStart + isl.w && 
+      rz >= isl.zStart && rz < isl.zStart + isl.d
+    );
+    return island ? island.id : null;
+  };
+
+  const minDim = Math.min(window.innerWidth, window.innerHeight);
+  const maxDim = Math.max(window.innerWidth, window.innerHeight);
+  const isTablet = maxDim <= 1366; // Changed to match previous tablet logic fix
+  const currentRobotPos = activeRobotId ? robotPositions[activeRobotId] : null;
+  const currentRobotIslandId = currentRobotPos ? getIslandId(currentRobotPos.x, currentRobotPos.z) : null;
+
 
   if (!gameStarted) {
     return (
       <>
         <div className="shining-stars"></div>
-        <div style={{
+        <div className="menu-layer" style={{
           position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           fontFamily: 'sans-serif', zIndex: 1000, pointerEvents: 'auto', userSelect: 'none'
@@ -922,6 +966,7 @@ function App() {
 
                  {/* Card 2 */}
                  <div 
+                   className="level-card"
                    style={{
                      background: '#d8dbdf', borderRadius: '24px', padding: '20px', width: '280px', height: '360px',
                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between',
@@ -941,6 +986,7 @@ function App() {
 
                  {/* Card 3 */}
                  <div 
+                   className="level-card"
                    style={{
                      background: '#d8dbdf', borderRadius: '24px', padding: '20px', width: '280px', height: '360px',
                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between',
@@ -1464,7 +1510,7 @@ function App() {
 
       <Canvas shadows style={{ background: 'transparent', position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
         <OrthographicCamera makeDefault position={[50, 50, 50]} zoom={40} near={-500} far={500} />
-        <CameraController isVictory={gameState === 'VICTORY'} targetPos={pos} arenaCenter={arenaCenter} />
+        <CameraController isVictory={gameState === 'VICTORY'} targetPos={pos} arenaCenter={arenaCenter} codingMode={codingMode} activeRobotPos={activeRobotId ? robotPositions[activeRobotId] : null} />
         
         <ambientLight intensity={0.6} />
         <directionalLight position={[20, 30, 10]} castShadow intensity={1.2} shadow-mapSize={[2048, 2048]} shadow-camera-left={-30} shadow-camera-right={30} shadow-camera-top={30} shadow-camera-bottom={-30} />
@@ -1559,6 +1605,7 @@ function App() {
           const cz = currentStone ? currentStone.z : item.z;
           const isOnButton = levelData.buttons.some(b => b.x === cx && b.z === cz);
           if (isOnButton) return null;
+          if (isTablet && currentRobotIslandId !== null && getIslandId(cx, cz) !== currentRobotIslandId) return null;
           return (
             <Html key={`stone-label-${item.id}`} position={[cx + 0.5, 1.5, cz + 0.5]} center sprite style={{ pointerEvents: 'none' }}>
               <div style={{
@@ -1576,6 +1623,7 @@ function App() {
         {codingMode && currentLevel >= 3 && (levelData.buttons?.filter(b => b.type === 'podium') || []).map((btn) => {
           const hasStone = stones.some(s => s.x === btn.x && s.z === btn.z);
           if (hasStone) return null;
+          if (isTablet && currentRobotIslandId !== null && getIslandId(btn.x, btn.z) !== currentRobotIslandId) return null;
           return (
             <Html key={`podium-label-${btn.id}`} position={[btn.x + 0.5, 1.5, btn.z + 0.5]} center sprite style={{ pointerEvents: 'none' }}>
               <div style={{
@@ -1590,7 +1638,9 @@ function App() {
           );
         })}
 
-        {codingMode && currentLevel >= 3 && levelData.robotButtons?.map((rb) => (
+        {codingMode && currentLevel >= 3 && levelData.robotButtons?.map((rb) => {
+          if (isTablet && currentRobotIslandId !== null && getIslandId(rb.x, rb.z) !== currentRobotIslandId) return null;
+          return (
           <Html key={`goto-label-${rb.id}`} position={[rb.x + 0.5, 1.5, rb.z + 0.5]} center sprite style={{ pointerEvents: 'none' }}>
             <div style={{
               background: 'rgba(0,0,0,0.8)', color: '#fff', padding: '4px 10px',
@@ -1601,9 +1651,12 @@ function App() {
               Button {rb.label}
             </div>
           </Html>
-        ))}
+          );
+        })}
 
-        {codingMode && currentLevel >= 3 && levelData.trampolines?.map((tramp, i) => (
+        {codingMode && currentLevel >= 3 && levelData.trampolines?.map((tramp, i) => {
+          if (isTablet && currentRobotIslandId !== null && getIslandId(tramp.x, tramp.z) !== currentRobotIslandId) return null;
+          return (
           <Html key={`trampoline-label-${tramp.id}`} position={[tramp.x + 0.5, 1.5, tramp.z + 0.5]} center sprite style={{ pointerEvents: 'none' }}>
             <div style={{
               background: 'rgba(0,0,0,0.8)', color: '#fff', padding: '4px 10px',
@@ -1614,7 +1667,8 @@ function App() {
               Trampoline {i + 1}
             </div>
           </Html>
-        ))}
+          );
+        })}
       </Canvas>
     </>
   );

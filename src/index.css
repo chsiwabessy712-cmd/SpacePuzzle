@@ -477,13 +477,71 @@ body::after {
   scrollbar-width: none;  /* Firefox */
 }
 
-@media (max-width: 1024px) {
+/* Level Card Global Styling */
+.level-card {
+  transition: transform 0.2s ease;
+}
+.level-card:hover {
+  transform: scale(1.05);
+}
+
+/* Force Landscape on all Portrait devices <= 1024px */
+@media screen and (max-width: 1024px) and (orientation: portrait) {
+  #root {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100vh;
+    height: 100vw;
+    transform: translate(-50%, -50%) rotate(90deg);
+    overflow: hidden;
+  }
+}
+
+/* Tablet (Portrait & Landscape sizes) */
+@media screen and (min-width: 768px) and (max-width: 1366px) {
   .dpad-container {
-    transform: scale(0.8);
+    transform: scale(0.8) !important;
     transform-origin: bottom right;
   }
   .guidance-popup {
-    width: 90% !important;
+    width: 80% !important;
     max-width: 600px !important;
+    transform: scale(0.9);
+  }
+  .level-card {
+    transform: scale(0.9);
+  }
+  .level-card:hover {
+    transform: scale(0.95);
+  }
+  .ui-layer, .menu-layer {
+    transform: scale(0.9);
+    transform-origin: center center;
+    width: 111.11% !important;
+    height: 111.11% !important;
+    left: -5.55% !important;
+    top: -5.55% !important;
+  }
+}
+
+/* Mobile (Portrait & Landscape sizes) */
+@media screen and (max-width: 767px) {
+  .dpad-container {
+    transform: scale(0.6) !important;
+    transform-origin: bottom right;
+  }
+  .guidance-popup {
+    width: 95% !important;
+    max-width: 400px !important;
+    transform: scale(0.75);
+  }
+  .ui-layer, .menu-layer {
+    transform: scale(0.75);
+    transform-origin: center center;
+    width: 133.33% !important;
+    height: 133.33% !important;
+    left: -16.66% !important;
+    top: -16.66% !important;
   }
 }
