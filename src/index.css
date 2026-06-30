@@ -530,17 +530,21 @@ body::after {
 /* Specific override for landscape tablet view when Chrome search bar takes up space */
 @media screen and (max-width: 1366px) and (max-height: 650px) and (orientation: landscape) {
   .dpad-container {
-    transform: scale(0.6) !important;
+    transform: scale(0.75) !important;
     transform-origin: bottom right;
   }
   .guidance-popup {
     transform: scale(0.7) !important;
   }
   .level-card {
-    transform: scale(0.7) !important;
+    transform: scale(0.95) !important;
+    margin: 0 -10px;
   }
   .level-card:hover {
-    transform: scale(0.75) !important;
+    transform: scale(1.0) !important;
+  }
+  .level-card-container {
+    gap: 10px !important;
   }
   .ui-layer, .menu-layer {
     transform: scale(0.75) !important;
@@ -550,22 +554,30 @@ body::after {
     left: -16.66% !important;
     top: -16.66% !important;
   }
+  .game-canvas {
+    transform: scale(0.85);
+    transform-origin: center center;
+  }
 }
 
 /* Specific override for even smaller tablet landscape view (e.g. 985x520) */
 @media screen and (max-width: 1000px) and (max-height: 550px) and (orientation: landscape) {
   .dpad-container {
-    transform: scale(0.5) !important;
+    transform: scale(0.7) !important;
     transform-origin: bottom right;
   }
   .guidance-popup {
-    transform: scale(0.6) !important;
+    transform: scale(0.65) !important;
   }
   .level-card {
-    transform: scale(0.6) !important;
+    transform: scale(0.9) !important;
+    margin: 0 -10px;
   }
   .level-card:hover {
-    transform: scale(0.65) !important;
+    transform: scale(0.95) !important;
+  }
+  .level-card-container {
+    gap: 5px !important;
   }
   .ui-layer, .menu-layer {
     transform: scale(0.65) !important;
@@ -574,6 +586,10 @@ body::after {
     height: 153.84% !important;
     left: -26.92% !important;
     top: -26.92% !important;
+  }
+  .game-canvas {
+    transform: scale(0.8);
+    transform-origin: center center;
   }
 }
 

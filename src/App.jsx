@@ -942,8 +942,8 @@ function App() {
                </div>
              </>
            ) : (
-             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '40px', zIndex: 10, width: '100%', padding: '0 20px' }}>
-               <div style={{ display: 'flex', gap: '30px', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+             <div className="ui-layer" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '40px', zIndex: 10, width: '100%', padding: '0 20px' }}>
+               <div className="level-card-container" style={{ display: 'flex', gap: '30px', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
                  {/* Card 1 */}
                  <div 
                    className="level-card"
@@ -1508,7 +1508,7 @@ function App() {
         </div>
       )}
 
-      <Canvas shadows style={{ background: 'transparent', position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
+      <Canvas className="game-canvas" shadows style={{ background: 'transparent', position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
         <OrthographicCamera makeDefault position={[50, 50, 50]} zoom={40} near={-500} far={500} />
         <CameraController isVictory={gameState === 'VICTORY'} targetPos={pos} arenaCenter={arenaCenter} codingMode={codingMode} activeRobotPos={activeRobotId ? robotPositions[activeRobotId] : null} />
         
