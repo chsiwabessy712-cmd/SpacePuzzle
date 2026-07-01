@@ -506,7 +506,7 @@ body::after {
     animation: none;
   }
   .shining-stars {
-    animation: shineStars 2s ease-in-out infinite alternate;
+    animation: none;
   }
   .dpad-container {
     transform: scale(0.8) !important;
