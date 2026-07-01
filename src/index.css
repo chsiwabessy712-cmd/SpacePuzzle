@@ -502,6 +502,12 @@ body::after {
 
 /* Tablet (Portrait & Landscape sizes) */
 @media screen and (min-width: 768px) and (max-width: 1366px) {
+  body::before {
+    animation: none;
+  }
+  .shining-stars {
+    animation: shineStars 2s ease-in-out infinite alternate;
+  }
   .dpad-container {
     transform: scale(0.8) !important;
     transform-origin: bottom right;
