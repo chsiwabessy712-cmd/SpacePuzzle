@@ -526,6 +526,11 @@ body::after {
     height: 100%;
     overflow: hidden;
   }
+  .guidance-space-btn {
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+  }
 }
 
 /* Tablet (Portrait & Landscape sizes) */
