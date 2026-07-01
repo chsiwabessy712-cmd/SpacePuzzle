@@ -643,7 +643,7 @@ const CameraController = ({ isVictory, targetPos, arenaCenter, codingMode, activ
         // Tablet class device
         if (isLandscape) {
           // Tablet landscape
-          targetZoom *= 0.35; 
+          targetZoom *= 0.5; 
         } else {
           // Tablet portrait
           targetZoom *= 1.2;
