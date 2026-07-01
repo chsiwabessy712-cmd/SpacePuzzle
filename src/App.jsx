@@ -1309,11 +1309,16 @@ function App() {
                   </div>
                 </div>
 
-                <div style={{
-                  background: '#7e57c2', borderRadius: '12px', padding: '15px', display: 'flex', flexDirection: 'column', gap: '12px'
-                }}>
-                  <div style={{ color: 'white', fontWeight: 'bold', fontSize: '14px', marginBottom: '5px' }}>Pick a target</div>
-                  <div className="target-list" style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto', paddingRight: '5px' }}>
+                <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px' }}>
+                  <div className="mobile-scroll-btns" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <button onClick={() => document.getElementById('targetListContainer').scrollBy({ top: -100, behavior: 'smooth' })} style={{ background: '#5B9A8B', color: 'white', border: 'none', borderRadius: '8px', padding: '15px 10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '18px' }}>▲</button>
+                    <button onClick={() => document.getElementById('targetListContainer').scrollBy({ top: 100, behavior: 'smooth' })} style={{ background: '#5B9A8B', color: 'white', border: 'none', borderRadius: '8px', padding: '15px 10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '18px' }}>▼</button>
+                  </div>
+                  <div style={{
+                    flex: 1, background: '#7e57c2', borderRadius: '12px', padding: '15px', display: 'flex', flexDirection: 'column', gap: '12px'
+                  }}>
+                    <div style={{ color: 'white', fontWeight: 'bold', fontSize: '14px', marginBottom: '5px' }}>Pick a target</div>
+                    <div id="targetListContainer" className="target-list" style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto', paddingRight: '5px' }}>
                     {levelData.robotButtons?.map(rb => (
                       <div key={rb.id} className="scratch-target" draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ category: 'target', targetId: rb.id, label: `Button ${rb.label}` }))} style={{ marginLeft: 12 }}>
                         <span style={{ display: 'inline-block', width: '10px', height: '10px', background: '#ff3366', borderRadius: '50%', marginRight: '6px' }}></span>
@@ -1351,6 +1356,7 @@ function App() {
                     ))}
                   </div>
                 </div>
+              </div>
             </div>
           </div>
 

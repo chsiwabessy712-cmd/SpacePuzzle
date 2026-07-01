@@ -511,8 +511,15 @@ body::after {
     overflow: hidden;
   }
 }
+
+.mobile-scroll-btns {
+  display: none !important;
+}
 /* Prevent all scrolling on phone and tablet */
 @media screen and (max-width: 1366px) {
+  .mobile-scroll-btns {
+    display: flex !important;
+  }
   html, body, #root {
     position: fixed;
     width: 100%;
@@ -524,7 +531,7 @@ body::after {
 /* Tablet (Portrait & Landscape sizes) */
 @media screen and (min-width: 768px) and (max-width: 1366px) {
   .scratch-cmd, .scratch-target {
-    touch-action: pan-y;
+    touch-action: none;
     -webkit-user-drag: element;
   }
   .coding-left-panel {
