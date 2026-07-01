@@ -536,7 +536,11 @@ body::after {
   }
   .coding-right-panel {
     transform: scale(0.7);
-    transform-origin: right center;
+    transform-origin: right top;
+    height: 142.85vh;
+  }
+  .coding-bottom-bar {
+    display: none !important;
   }
   body::before {
     animation: none;

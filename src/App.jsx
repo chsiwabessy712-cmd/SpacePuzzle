@@ -1250,7 +1250,7 @@ function App() {
             </div>
 
             {/* Bottom Bar */}
-            <div style={{
+            <div className="coding-bottom-bar" style={{
               position: 'absolute', bottom: 0, left: 0, width: '100%', height: '60px', background: '#20223d', display: 'flex', alignItems: 'center', padding: '0 30px', gap: '30px', color: 'white', fontFamily: 'sans-serif', pointerEvents: 'auto'
             }}>
               {/* P leave terminal */}
