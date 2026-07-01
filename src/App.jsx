@@ -639,10 +639,12 @@ const CameraController = ({ isVictory, targetPos, arenaCenter, codingMode, activ
       
       if (minDim >= 768 && maxDim <= 1366) {
         // Tablet class device
-        targetZoom *= 1.2;
-        if (window.innerWidth > window.innerHeight && window.innerHeight <= 700) {
-          // Cramped tablet landscape (like Chrome)
-          targetZoom *= 0.65;
+        if (window.innerWidth > window.innerHeight) {
+          // Tablet landscape
+          targetZoom *= 0.6;
+        } else {
+          // Tablet portrait
+          targetZoom *= 1.2;
         }
       } else if (minDim < 768) {
         // Mobile class device
