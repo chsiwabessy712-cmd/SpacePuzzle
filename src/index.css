@@ -555,6 +555,9 @@ body::after {
   .coding-bottom-bar {
     display: none !important;
   }
+  body {
+    animation: none;
+  }
   body::before {
     animation: none;
   }
