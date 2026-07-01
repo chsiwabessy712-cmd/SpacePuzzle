@@ -1271,7 +1271,7 @@ function App() {
             </div>
 
             {/* Pick a command floating box */}
-            <div style={{
+            <div className="coding-left-panel" style={{
               position: 'absolute', right: '20px', top: '80px', width: '220px', display: 'flex', flexDirection: 'column', gap: '15px', pointerEvents: 'auto'
             }}>
                <div style={{
@@ -1360,7 +1360,7 @@ function App() {
           </div>
 
           {/* Right Panel (Code Space) */}
-          <div style={{
+          <div className="coding-right-panel" style={{
             flex: '0 0 340px', background: '#2c2b54', display: 'flex', flexDirection: 'column', padding: '40px', pointerEvents: 'auto'
           }}>
              {/* Lines indicator */}
