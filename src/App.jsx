@@ -1309,13 +1309,13 @@ function App() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px' }}>
-                  <div className="mobile-scroll-btns" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ position: 'relative' }}>
+                  <div className="mobile-scroll-btns" style={{ position: 'absolute', left: '-50px', top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <button onClick={() => document.getElementById('targetListContainer').scrollBy({ top: -100, behavior: 'smooth' })} style={{ background: '#5B9A8B', color: 'white', border: 'none', borderRadius: '8px', padding: '15px 10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '18px' }}>▲</button>
                     <button onClick={() => document.getElementById('targetListContainer').scrollBy({ top: 100, behavior: 'smooth' })} style={{ background: '#5B9A8B', color: 'white', border: 'none', borderRadius: '8px', padding: '15px 10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '18px' }}>▼</button>
                   </div>
                   <div style={{
-                    flex: 1, background: '#7e57c2', borderRadius: '12px', padding: '15px', display: 'flex', flexDirection: 'column', gap: '12px'
+                    background: '#7e57c2', borderRadius: '12px', padding: '15px', display: 'flex', flexDirection: 'column', gap: '12px'
                   }}>
                     <div style={{ color: 'white', fontWeight: 'bold', fontSize: '14px', marginBottom: '5px' }}>Pick a target</div>
                     <div id="targetListContainer" className="target-list" style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '250px', overflowY: 'auto', paddingRight: '5px' }}>
