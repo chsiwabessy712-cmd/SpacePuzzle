@@ -1075,7 +1075,7 @@ function App() {
               {isMuted ? '🔇' : '🔊'}
             </button>
           </div>
-          <h1 style={{ margin: 0, textShadow: '0 0 10px #00f3ff', color: '#00f3ff', fontSize: '2rem', letterSpacing: '2px', textTransform: 'uppercase' }}>PUZZLE ARENA</h1>
+          <h1 style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', margin: 0, textShadow: '0 0 10px #00f3ff', color: '#00f3ff', fontSize: '2rem', letterSpacing: '2px', textTransform: 'uppercase', pointerEvents: 'none' }}>PUZZLE ARENA</h1>
           <div style={{ display: 'flex', gap: '10px', pointerEvents: 'auto' }}>
             {!codingMode && (
               <button 
@@ -1238,7 +1238,7 @@ function App() {
           {/* Left Area (Transparent over Game) */}
           <div style={{ flex: 1, position: 'relative' }}>
             {/* Top Right Close */}
-            <button onClick={() => setCodingMode(false)} style={{
+            <button className="coding-close-btn" onClick={() => setCodingMode(false)} style={{
               position: 'absolute', top: '20px', right: '72px',
               background: '#20223d', color: 'white', border: 'none', borderRadius: '50%',
               width: '36px', height: '36px', fontSize: '16px', cursor: 'pointer', zIndex: 5, pointerEvents: 'auto'
@@ -1272,13 +1272,8 @@ function App() {
 
             {/* Pick a command floating box */}
             <div className="coding-left-panel" style={{
-              position: 'absolute', right: '20px', top: '80px', width: '220px', display: 'flex', flexDirection: 'column', gap: '15px', pointerEvents: 'auto'
+              position: 'absolute', right: '20px', top: '70px', width: '220px', display: 'flex', flexDirection: 'column', gap: '15px', pointerEvents: 'auto'
             }}>
-               <div style={{
-                 background: '#3a365f', borderRadius: '24px', padding: '8px', textAlign: 'center', alignSelf: 'flex-end', width: '140px'
-               }}>
-                 <div style={{ fontSize: '24px' }}>🤖</div>
-               </div>
                <div style={{
                  background: '#7e57c2', borderRadius: '12px', padding: '15px', display: 'flex', flexDirection: 'column', gap: '12px'
                }}>

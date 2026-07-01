@@ -506,6 +506,9 @@ body::after {
     transform: scale(0.7) translateX(145px);
     transform-origin: right top;
   }
+  .coding-close-btn {
+    transform: translateX(155px);
+  }
   .coding-right-panel {
     transform: scale(0.7);
     transform-origin: right center;
