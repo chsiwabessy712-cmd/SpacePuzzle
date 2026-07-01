@@ -1368,6 +1368,7 @@ function App() {
 
              {/* Code Area */}
              <div 
+               onDragEnter={(e) => e.preventDefault()}
                onDragOver={(e) => e.preventDefault()}
                onDrop={(e) => {
                  e.preventDefault();
@@ -1429,6 +1430,7 @@ function App() {
                            {!isComplete && <div className="scratch-hole-right" />}
                          </div>
                          <div 
+                           onDragEnter={(e) => e.preventDefault()}
                            onDragOver={(e) => e.preventDefault()}
                            onDrop={(e) => {
                              e.preventDefault();
@@ -1468,6 +1470,7 @@ function App() {
              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '20px', marginTop: '20px' }}>
                 {robotCommands.length > 0 && !isRobotRunning && (
                   <div 
+                    onDragEnter={(e) => e.preventDefault()}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => {
                       e.preventDefault();
