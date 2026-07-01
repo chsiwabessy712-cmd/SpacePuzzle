@@ -9,7 +9,8 @@ import "mobile-drag-drop/default.css";
 const isMobileOrTabletView = window.matchMedia("(max-width: 1366px)").matches;
 polyfill({
   dragImageTranslateOverride: scrollBehaviourDragImageTranslateOverride,
-  forceApply: isMobileOrTabletView
+  forceApply: isMobileOrTabletView,
+  holdToDrag: 300 // allow scrolling, drag activates on hold
 });
 window.addEventListener('touchmove', function() {}, {passive: false});
 

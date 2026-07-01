@@ -524,7 +524,7 @@ body::after {
 /* Tablet (Portrait & Landscape sizes) */
 @media screen and (min-width: 768px) and (max-width: 1366px) {
   .scratch-cmd, .scratch-target {
-    touch-action: none;
+    touch-action: pan-y;
     -webkit-user-drag: element;
   }
   .coding-left-panel {
