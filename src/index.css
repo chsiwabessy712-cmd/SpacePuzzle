@@ -537,7 +537,8 @@ body::after {
   .coding-right-panel {
     transform: scale(0.7);
     transform-origin: right top;
-    height: 142.85vh;
+    height: 142.86% !important;
+    max-height: none !important;
   }
   .coding-bottom-bar {
     display: none !important;
