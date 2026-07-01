@@ -1145,7 +1145,7 @@ function App() {
               style={{ width: '160px', padding: '12px', borderRadius: '16px', background: '#ff3366', border: 'none', color: 'white', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer', transition: 'transform 0.1s', boxShadow: '0 4px 0 #cc0044', pointerEvents: 'auto' }}
               onMouseDown={(e) => e.target.style.transform = 'translateY(4px)'} onMouseUp={(e) => e.target.style.transform = 'none'} onMouseLeave={(e) => e.target.style.transform = 'none'}
             >
-              PRESS TO ACT
+              SPACE BUTTON
             </button>
           </div>
         )}
