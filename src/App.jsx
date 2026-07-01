@@ -636,12 +636,14 @@ const CameraController = ({ isVictory, targetPos, arenaCenter, codingMode, activ
       // Responsive zoom adjustments based on physical device class
       const minDim = Math.min(window.innerWidth, window.innerHeight);
       const maxDim = Math.max(window.innerWidth, window.innerHeight);
+      const isLandscape = window.innerWidth > window.innerHeight;
+      const isTablet = (minDim >= 768 && maxDim <= 1366) || (isLandscape && window.innerWidth >= 768 && window.innerWidth <= 1366);
       
-      if (minDim >= 768 && maxDim <= 1366) {
+      if (isTablet) {
         // Tablet class device
-        if (window.innerWidth > window.innerHeight) {
+        if (isLandscape) {
           // Tablet landscape
-          targetZoom *= 0.25;
+          targetZoom *= 0.35; 
         } else {
           // Tablet portrait
           targetZoom *= 1.2;
